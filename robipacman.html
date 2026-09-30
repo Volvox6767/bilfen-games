@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Robi PacMan - Bilgi Yarışması</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',Tahoma,sans-serif;touch-action:none}
+#wrap{width:100%;height:100%;display:flex;justify-content:center;align-items:center;flex-direction:column}
+canvas{display:block}
+#hud{position:fixed;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:16px;z-index:10}
+.hi{color:#fff;font-size:15px;font-weight:bold;text-shadow:1px 1px 3px rgba(0,0,0,.8);background:rgba(0,0,0,.6);padding:4px 10px;border-radius:10px}
+.hi span{color:#FFD700}
+.ov{display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:100;justify-content:center;align-items:center}
+.ov.on{display:flex}
+#startOv{background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);z-index:200}
+#quizOv{background:rgba(0,0,0,.88)}
+#lvlOv{background:rgba(0,0,0,.85)}
+#overOv{background:rgba(0,0,0,.92)}
+#winOv{background:rgba(0,0,0,.92)}
+.box{background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #e94560;border-radius:16px;padding:24px;max-width:440px;width:90%;color:#fff;text-align:center;box-shadow:0 0 30px rgba(233,69,96,.4)}
+.box h1{font-size:36px;margin-bottom:4px}
+.box p{font-size:14px;color:#aaa;margin:4px 0;line-height:1.5}
+.sub{color:#e94560;font-size:13px;letter-spacing:2px;text-transform:uppercase}
+.gold{color:#FFD700}
+.red{color:#e94560}
+.btn{margin-top:16px;padding:12px 36px;font-size:18px;background:#e94560;color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:bold;transition:transform .2s}
+.btn:hover{transform:scale(1.05)}
+#qCat{color:#e94560;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+#qText{font-size:17px;font-weight:bold;margin-bottom:16px;line-height:1.4}
+.qo{background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;cursor:pointer;text-align:left;margin:6px 0;transition:all .2s}
+.qo:hover{background:rgba(233,69,96,.3);border-color:#e94560}
+.qo.ok{background:rgba(0,200,83,.4);border-color:#00c853}
+.qo.no{background:rgba(255,0,0,.4);border-color:#f00}
+.qo.off{pointer-events:none;opacity:.5}
+#qFb{margin-top:10px;font-size:15px;font-weight:bold;min-height:20px}
+#joy{display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:140px;height:140px;z-index:50}
+#joyB{width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.2)}
+#joyT{width:50px;height:50px;border-radius:50%;background:rgba(233,69,96,.6);border:2px solid #e94560;position:absolute;top:45px;left:45px;transition:none}
+@media(hover:none)and(pointer:coarse){#joy{display:block}}
+</style>
+</head>
+<body>
+<div id="wrap"></div>
+<div id="hud">
+  <div class="hi">Puan: <span id="sc">0</span></div>
+  <div class="hi">Seviye: <span id="lv">1</span></div>
+  <div class="hi">Doğru: <span id="co">0</span>/3</div>
+  <div class="hi" id="lives"></div>
+</div>
+<div id="startOv" class="ov on">
+  <div class="box">
+    <h1>🟡 ROBI PACMAN</h1>
+    <p class="sub">Bilgi Yarışması Macerası</p>
+    <p>Labirentteki soru noktalarına ulaş ve bilgini göster!</p>
+    <p>✅ Doğru: +10 &nbsp; ❌ Yanlış: -5 &nbsp; 👻 Canavarlara dikkat!</p>
+    <p class="gold">🎯 Her 3 doğru = yeni seviye</p>
+    <button class="btn" onclick="go()">▶ OYUNA BAŞLA</button>
+  </div>
+</div>
+<div id="quizOv" class="ov">
+  <div class="box">
+    <div id="qCat">📜 Günlük Yaşam ve Teknoloji</div>
+    <div id="qText"></div>
+    <div id="qOpts"></div>
+    <div id="qFb"></div>
+  </div>
+</div>
+<div id="lvlOv" class="ov">
+  <div class="box">
+    <h1 class="gold">🎉 SEVİYE <span id="nlv">2</span>!</h1>
+    <p>Harika! Labirent zorlaşıyor...</p>
+  </div>
+</div>
+<div id="overOv" class="ov">
+  <div class="box">
+    <h1 class="red">💀 OYUN BİTTİ</h1>
+    <p>Puan: <span id="fs">0</span> | Seviye: <span id="fl">1</span></p>
+    <button class="btn" onclick="restart()">🔄 Tekrar Oyna</button>
+  </div>
+</div>
+<div id="winOv" class="ov">
+  <div class="box">
+    <h1 class="gold">🏆 TEBRİKLER!</h1>
+    <p>Tüm labirentler tamamlandı!</p>
+    <p>Puan: <span id="ws">0</span></p>
+    <button class="btn" onclick="restart()">🔄 Tekrar Oyna</button>
+  </div>
+</div>
+<div id="joy"><div id="joyB"></div><div id="joyT"></div></div>
+
+<script>
+// ===== QUESTIONS =====
+const QS=[
+{q:"Bilgisayarı öğretmen 'aç' dediğinde ne yapmalıyız?",o:["Bilgisayarı açmalıyız","Bilgisayarı kapatmalıyız","Sıfırlamalıyız","Silmeliyiz"],a:0},
+{q:"Enerji tasarrufu için ne yapmalıyız?",o:["Gereksiz ışıkları kapatmalıyız","Tüm cihazları açık bırakmalıyız","Klimayı hep açık tutmalıyız","Uyumadan kapatmamalıyız"],a:0},
+{q:"İnternette güvenli davranış nedir?",o:["Kişisel bilgi paylaşmamak","Her siteye şifre girmek","Tanımadıklarla buluşmak","Her linke tıklamak"],a:0},
+{q:"Uzun süre bilgisayar başında oturunca?",o:["Mola verip dinlenmeliyiz","Daha hızlı çalışmalıyız","Ekranı kapatmamalıyız","Hiç mola almamalıyız"],a:0},
+{q:"Elektronik atıkları nereye atmalıyız?",o:["Özel geri dönüşüm kutularına","Normal çöpe","Doğaya","Nehirlere"],a:0},
+{q:"Wi-Fi şifremizi neden paylaşmamalıyız?",o:["Güvenliğimiz için","Şifre uzun olduğu için","Hızlı olsun diye","Başka sebep yok"],a:0},
+{q:"Uygulama indirirken nelere dikkat ederiz?",o:["Güvenilir mağazalardan indiririz","Her uygulamayı indiririz","Reklamlara tıklarız","Yorumları okumayız"],a:0},
+{q:"Siber zorbalık nedir?",o:["İnternetten kötü sözler söylemek","Oyun oynamak","Videolar izlemek","Araştırma yapmak"],a:0},
+{q:"Doğru bilgi kaynağını nasıl anlarız?",o:["Güvenilir kaynakları kontrol ederiz","Her habere inanırız","Sosyal medyadaki her şeyi paylaşırız","Tek bir siteden bakarız"],a:0},
+{q:"Telefon şarj cihazını ne zaman çıkarmalıyız?",o:["Şarjı dolduğunda","Hiç çıkarmamalıyız","Her gün","Sadece gece"],a:0},
+{q:"Enerji tasarrufu ampulü hangisidir?",o:["LED ampul","Güneş ampulü","Klasik ampul","Renkli ampul"],a:0},
+{q:"Bilgisayarı kapatırken doğru sıra?",o:["Önce programları, sonra bilgisayarı","Doğrudan prizi çekeriz","Sadece monitörü kapatırız","Hiç kapatmayız"],a:0},
+{q:"Tanımadık kişilerden ne yapmalıyız?",o:["Bilgi vermemeliyiz","Hemen buluşmalıyız","Kişisel bilgi vermeliyiz","Arkadaşlık kabul etmeliyiz"],a:0},
+{q:"Suyu israf etmemek için?",o:["Diş fırçalarken kapatmalıyız","Musluğu açık bırakmalıyız","Duşta akıtmalıyız","Her gün sulamalıyız"],a:0},
+{q:"Bilgisayarda virüs nedir?",o:["Kötü yazılımdır","Oyun programıdır","Hız artıran programdır","Güvenlik programıdır"],a:0},
+{q:"Güçlü şifre nasıl olmalıdır?",o:["Harf, rakam, özel karakter","Doğum tarihi olabilir","Kolay hatırlanabilir","123456 olabilir"],a:0},
+{q:"Geri dönüşümün önemi?",o:["Doğayı korur","Çöpleri çoğaltır","Enerji harcar","Zararlı gaz üretir"],a:0},
+{q:"Dijital okuryazarlık nedir?",o:["Dijital araçları doğru kullanma","Dijital kitap okuma","E-kitap yazma","Fotoğraf çekme"],a:0},
+{q:"Bulut bilişim nedir?",o:["İnternet üzerinden veri depolama","Hava durumu uygulaması","Bulutlu günler için program","Yeni Windows sürümü"],a:0},
+{q:"Yazılım güncelleştirmesi neden önemli?",o:["Güvenlik açıklarını kapatır","Bilgisayarı yavaşlatır","Dosyaları siler","Programı bozar"],a:0}
+];
+
+// ===== MAZES =====
+const MAZES=[
+[[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],[1,2,2,2,1,2,2,3,2,2,2,1,2,2,1],[1,2,1,2,1,2,1,1,1,2,1,1,2,1,1],[1,2,1,2,2,2,2,2,2,2,2,1,2,2,1],[1,2,1,1,1,2,1,1,1,2,1,1,1,2,1],[1,2,2,2,2,2,2,3,2,2,2,2,2,2,1],[1,1,1,2,1,1,1,1,1,1,1,2,1,1,1],[1,3,2,2,2,2,1,4,1,2,2,2,2,3,1],[1,1,1,2,1,1,1,1,1,1,1,2,1,1,1],[1,2,2,2,2,2,2,3,2,2,2,2,2,2,1],[1,2,1,1,1,2,1,1,1,2,1,1,1,2,1],[1,2,2,1,2,2,2,2,2,2,2,1,2,2,1],[1,1,2,1,2,1,1,2,1,1,2,1,2,1,1],[1,2,2,2,2,2,2,2,2,2,2,2,2,2,1],[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]],
+[[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],[1,2,2,2,2,1,2,2,2,1,2,2,3,2,1],[1,2,1,1,2,1,2,1,2,1,2,1,1,2,1],[1,2,1,2,2,2,2,1,2,2,2,2,1,2,1],[1,3,2,2,1,1,2,1,2,1,1,2,2,3,1],[1,2,1,2,2,4,2,2,2,4,2,2,1,2,1],[1,2,1,1,1,2,1,1,1,2,1,1,1,2,1],[1,2,2,2,3,2,2,1,2,2,3,2,2,2,1],[1,2,1,1,1,2,1,1,1,2,1,1,1,2,1],[1,2,1,2,2,4,2,2,2,4,2,2,1,2,1],[1,3,2,2,1,1,2,1,2,1,1,2,2,3,1],[1,2,1,2,2,2,2,1,2,2,2,2,1,2,1],[1,2,1,1,2,1,2,1,2,1,2,1,1,2,1],[1,2,2,2,2,2,2,2,2,2,2,2,2,2,1],[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]],
+[[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],[1,3,2,1,2,2,3,2,3,2,2,1,2,3,1],[1,2,2,1,2,1,1,2,1,1,2,1,2,2,1],[1,1,2,1,2,2,2,2,2,2,2,1,2,1,1],[1,2,2,2,1,1,2,1,2,1,1,2,2,2,1],[1,2,1,2,2,4,2,2,2,4,2,2,1,2,1],[1,2,1,1,2,2,1,1,1,2,2,1,1,2,1],[1,3,2,2,2,2,1,4,1,2,2,2,2,3,1],[1,2,1,1,2,2,1,1,1,2,2,1,1,2,1],[1,2,1,2,2,4,2,2,2,4,2,2,1,2,1],[1,2,2,2,1,1,2,1,2,1,1,2,2,2,1],[1,1,2,1,2,2,2,2,2,2,2,1,2,1,1],[1,2,2,1,2,1,1,2,1,1,2,1,2,2,1],[1,3,2,1,2,2,3,2,3,2,2,1,2,3,1],[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]
+];
+
+const T=32,C=15,R=15,W=C*T,H=R*T+30;
+let canvas,ctx;
+let maze=[],score=0,level=1,lives=3,correct=0,running=false,paused=false;
+let px=1,py=1,pdir={x:0,y:0},ndir={x:0,y:0};
+let moveT=0,PSPEED=0.08;
+let mouth=true,mtmr=0;
+let ghEaten=false,ghET=0;
+let usedQ=[];
+let ghostBaseSpd=0.04;
+let ghosts=[];
+let player={x:0,y:0};
+let dots=[]; // {c,r,type,eaten,pulseVal}
+let robiImg=null;
+let robiReady=false;
+
+// Load robi image
+robiImg=new Image();
+robiImg.onload=function(){robiReady=true;};
+robiImg.src='robi-temiz.png';
+
+// ===== HELPERS =====
+function ok(c,r){return r>=0&&r<R&&c>=0&&c<C&&maze[r]!==undefined&&maze[r][c]!==undefined&&maze[r][c]!==1}
+function adj(c,r){const d=[{x:0,y:-1},{x:0,y:1},{x:-1,y:0},{x:1,y:0}];return d.filter(dd=>ok(c+dd.x,r+dd.y)).map(dd=>({x:c+dd.x,y:r+dd.y,d:dd}))}
+function p2g(x,y){return{c:Math.round((x-T/2)/T),r:Math.round((y-T-30)/T)}}
+
+// ===== INIT =====
+function init(){
+  canvas=document.createElement('canvas');
+  canvas.width=W;canvas.height=H;
+  canvas.style.borderRadius='8px';
+  canvas.style.boxShadow='0 0 20px rgba(233,69,96,0.3)';
+  document.getElementById('wrap').appendChild(canvas);
+  ctx=canvas.getContext('2d');
+  document.addEventListener('keydown',onKey);
+  setupJoystick();
+  // Init default maze for start screen
+  maze=JSON.parse(JSON.stringify(MAZES[0]));
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){const v=maze[r][c];if(v>=2)dots.push({c,r,type:v,eaten:false,pulseVal:Math.random()*6});}
+  player.x=1*T;player.y=1*T;
+  requestAnimationFrame(gameLoop);
+}
+
+// ===== DRAW =====
+function drawMaze(){
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const v=maze[r][c];
+    if(v===1){
+      ctx.fillStyle='#0a0a3d';
+      ctx.fillRect(c*T,r*T+30,T,T);
+      ctx.strokeStyle='#1a1a5e';ctx.lineWidth=1;
+      ctx.strokeRect(c*T,r*T+30,T,T);
+    }else{
+      ctx.fillStyle='#000000';
+      ctx.fillRect(c*T,r*T+30,T,T);
+    }
+  }
+}
+
+function drawDots(){
+  for(const d of dots){
+    if(d.eaten)continue;
+    const cx=d.c*T+T/2, cy=d.r*T+T/2+30;
+    if(d.type===2){
+      // Small dot
+      ctx.fillStyle='#FFD700';
+      ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();
+    }else if(d.type===3){
+      // Question mark
+      const pulse=1+Math.sin(d.pulseVal)*0.1;
+      ctx.save();ctx.translate(cx,cy);ctx.scale(pulse,pulse);
+      ctx.fillStyle='#e94560';
+      roundRect(ctx,-(T/2-4),-(T/2-4),T-8,T-8,6);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='bold 18px Segoe UI';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('?',0,0);
+      ctx.restore();
+    }else if(d.type===4){
+      // Power pellet
+      const pulse=1+Math.sin(d.pulseVal)*0.15;
+      ctx.save();ctx.translate(cx,cy);ctx.scale(pulse,pulse);
+      ctx.fillStyle='#FFD700';
+      ctx.beginPath();ctx.arc(0,0,10,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+function drawRobi(){
+  const cx=player.x+T/2, cy=player.y+30+T/2;
+  if(robiReady){
+    ctx.save();
+    ctx.translate(cx,cy);
+    if(pdir.x<0)ctx.scale(-1,1);
+    const sz=T;
+    ctx.drawImage(robiImg,-sz/2,-sz/2,sz,sz);
+    // Mouth open/close effect
+    if(!mouth){
+      ctx.globalAlpha=0.15;ctx.fillStyle='#000';
+      ctx.beginPath();ctx.arc(2,4,5,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;
+    }
+    ctx.restore();
+  }else{
+    // Fallback: Pac-Man style
+    let a=0;
+    if(pdir.x===1)a=0;else if(pdir.x===-1)a=Math.PI;else if(pdir.y===-1)a=-Math.PI/2;else if(pdir.y===1)a=Math.PI/2;
+    const ma=mouth?0.35:0.05;
+    ctx.fillStyle='#FFD700';
+    ctx.beginPath();ctx.arc(cx,cy,T/2-2,a+ma,a-ma+Math.PI*2);ctx.lineTo(cx,cy);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#000';
+    ctx.beginPath();ctx.arc(cx+(pdir.x===1?-4:pdir.x===-1?4:-4),cy+(pdir.y===-1?-2:pdir.y===1?2:-4),2.5,0,Math.PI*2);ctx.fill();
+  }
+}
+
+function drawGhost(g){
+  const cx=g.x+T/2, cy=g.y+30+T/2;
+  const col=g.frightened?'#4444ff':g.colorHex;
+  const eyeCol=g.frightened?'#ff0000':'#000033';
+
+  // Body
+  ctx.fillStyle=col;
+  roundRect(ctx,cx-T/2+4,cy-T/2+4,T-8,T-10,8);ctx.fill();
+  // Wavy bottom
+  for(let i=0;i<4;i++){
+    ctx.beginPath();ctx.arc(cx-T/2+6+i*6,cy+T/2-6,4,0,Math.PI*2);ctx.fill();
+  }
+  // Eyes
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath();ctx.arc(cx-5,cy-4,5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(cx+5,cy-4,5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=eyeCol;
+  ctx.beginPath();ctx.arc(cx-4,cy-3,2.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(cx+6,cy-3,2.5,0,Math.PI*2);ctx.fill();
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function drawFrame(){
+  ctx.clearRect(0,0,W,H);
+  // Background
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  // Maze
+  drawMaze();
+  // Dots
+  drawDots();
+  // Ghosts
+  for(const g of ghosts)drawGhost(g);
+  // Player
+  drawRobi();
+}
+
+// ===== GHOST AI =====
+function moveGhost(g,dt){
+  const gc=p2g(g.x,g.y);g.gc=gc.c;g.gr=gc.r;
+  const cx=gc.c*T+T/2,cy=gc.r*T;
+  const d=Math.sqrt((g.x-cx)**2+(g.y-cy)**2);
+  if(d<2){
+    g.x=cx;g.y=cy;
+    const ad=adj(gc.c,gc.r);if(!ad.length){g.dx=0;g.dy=0;return;}
+    const opp={x:-g.dx,y:-g.dy};
+    let tgt={x:px,y:py};
+    if(g.mode==='scatter'){const cn=[{x:1,y:1},{x:13,y:1},{x:1,y:13},{x:13,y:13}];tgt=cn[ghosts.indexOf(g)%4];}
+    if(g.mode==='patrol'){
+      if(!g.pt||!ok(g.pt.x,g.pt.y)){let t=0;do{g.pt={x:Math.floor(Math.random()*13)+1,y:Math.floor(Math.random()*13)+1};t++;}while(!ok(g.pt.x,g.pt.y)&&t<100);}
+      if(Math.abs(gc.c-g.pt.x)<=1&&Math.abs(gc.r-g.pt.y)<=1){let t=0;do{g.pt={x:Math.floor(Math.random()*13)+1,y:Math.floor(Math.random()*13)+1};t++;}while(!ok(g.pt.x,g.pt.y)&&t<100);}
+      tgt=g.pt;
+    }
+    let best=null,bd=Infinity;
+    for(const a of ad){if(a.d.x===opp.x&&a.d.y===opp.y&&ad.length>1)continue;const dd=(a.x-tgt.x)**2+(a.y-tgt.y)**2+Math.random()*2;if(dd<bd){bd=dd;best=a.d;}}
+    if(best){g.dx=best.x;g.dy=best.y;}
+  }
+  if(!g.dx&&!g.dy)return;
+  const spd=g.spd*dt;let nx=g.x+g.dx*spd,ny=g.y+g.dy*spd;
+  const nc=p2g(nx,ny);
+  if(!ok(nc.c,nc.r)){g.x=cx;g.y=cy;g.dx=0;g.dy=0;return;}
+  const tx=p2g(nx,g.y),ty=p2g(g.x,ny);
+  if(g.dx&&!ok(tx.c,tx.r)){g.x=cx;g.dx=0;}
+  else if(g.dy&&!ok(ty.c,ty.r)){g.y=cy;g.dy=0;}
+  else{g.x=nx;g.y=ny;}
+}
+
+// ===== GAME LOOP =====
+let lastTime=0;
+function gameLoop(time){
+  const dt=lastTime?(time-lastTime)/16.67:1;
+  lastTime=time;
+  if(running&&!paused){
+    // Player movement
+    moveT+=PSPEED*dt;
+    if(moveT>=1){
+      moveT=0;
+      const nc={c:px+ndir.x,r:py+ndir.y};
+      if(ok(nc.c,nc.r))pdir={...ndir};
+      const mc={c:px+pdir.x,r:py+pdir.y};
+      if(ok(mc.c,mc.r)){px=mc.c;py=mc.r;}
+      player.x=px*T;player.y=py*T;
+    }
+    // Mouth animation
+    mtmr+=dt;if(mtmr>8){mtmr=0;mouth=!mouth;}
+    // Ghost movement
+    const gs=ghostBaseSpd+(level-1)*0.008;
+    for(const g of ghosts){g.spd=gs;moveGhost(g,dt);}
+    // Ghost eat timer
+    if(ghEaten){ghET-=dt;if(ghET<=0){ghEaten=false;for(const g of ghosts)g.frightened=false;}}
+    // Dot pulse
+    for(const d of dots){if(!d.eaten&&d.type>=3){d.pulseVal+=0.05*dt;}}
+    // Collisions
+    checkCol();
+  }
+  // Always draw
+  drawFrame();
+  requestAnimationFrame(gameLoop);
+}
+
+// ===== COLLISIONS =====
+function checkCol(){
+  // Dot collection
+  for(const d of dots){
+    if(!d.eaten&&d.c===px&&d.r===py){
+      d.eaten=true;
+      if(d.type===3){score+=5;showQ();return;}
+      if(d.type===4){score+=5;ghEaten=true;ghET=120;for(const g of ghosts)g.frightened=true;}
+      else{score++;}
+      updHUD();
+    }
+  }
+  // Ghost collision
+  for(const g of ghosts){
+    const dx=g.x-player.x,dy=g.y-player.y;
+    if(Math.sqrt(dx*dx+dy*dy)<T*0.7){
+      if(g.frightened){
+        score+=20;g.frightened=false;
+        g.x=g.sx*T;g.y=g.sy*T;g.dx=0;g.dy=0;
+        updHUD();
+      }else{loseLife();return;}
+    }
+  }
+}
+
+// ===== QUIZ =====
+function showQ(){
+  paused=true;
+  const avail=QS.filter((_,i)=>!usedQ.includes(i));
+  if(!avail.length){usedQ.length=0;return showQ();}
+  const qi=Math.floor(Math.random()*avail.length);
+  const q=avail[qi];usedQ.push(QS.indexOf(q));
+  document.getElementById('qText').textContent=q.q;
+  const od=document.getElementById('qOpts');od.innerHTML='';
+  const idx=[0,1,2,3].sort(()=>Math.random()-.5);
+  const ci=idx.indexOf(q.a);
+  idx.forEach((oi,di)=>{
+    const b=document.createElement('div');b.className='qo';
+    b.textContent=String.fromCharCode(65+di)+') '+q.o[oi];
+    b.onclick=()=>ansQ(di===ci,b);od.appendChild(b);
+  });
+  document.getElementById('qFb').textContent='';
+  document.getElementById('quizOv').classList.add('on');
+}
+function ansQ(ok,b){
+  document.querySelectorAll('.qo').forEach(x=>x.classList.add('off'));
+  const fb=document.getElementById('qFb');
+  if(ok){b.classList.add('ok');score+=10;correct++;fb.textContent='✅ Doğru!';fb.style.color='#00c853';}
+  else{b.classList.add('no');score=Math.max(0,score-5);correct=Math.max(0,correct-1);fb.textContent='❌ Yanlış!';fb.style.color='#f00';}
+  updHUD();
+  setTimeout(()=>{
+    document.getElementById('quizOv').classList.remove('on');paused=false;
+    if(correct>=3){if(level>=3)showWin();else lvlUp();}
+  },1000);
+}
+
+// ===== HUD =====
+function updHUD(){
+  document.getElementById('sc').textContent=score;
+  document.getElementById('lv').textContent=level;
+  document.getElementById('co').textContent=correct;
+  document.getElementById('lives').textContent='❤️'.repeat(lives);
+}
+
+// ===== GAME FLOW =====
+function loseLife(){
+  lives--;updHUD();
+  if(lives<=0){running=false;document.getElementById('fs').textContent=score;document.getElementById('fl').textContent=level;document.getElementById('overOv').classList.add('on');return;}
+  px=1;py=1;player.x=px*T;player.y=py*T;pdir={x:0,y:0};ndir={x:0,y:0};
+  resetGhosts();
+}
+function resetGhosts(){
+  ghosts=[];
+  const gs=[{c:0xff0000,hc:'#ff0000',x:4,y:5,m:'chase'},{c:0xff69b4,hc:'#ff69b4',x:6,y:5,m:'scatter'},{c:0x00ced1,hc:'#00ced1',x:10,y:5,m:'random'},{c:0xff8c00,hc:'#ff8c00',x:12,y:5,m:'patrol'}];
+  for(const g of gs)ghosts.push({x:g.x*T,y:g.sy*T,sx:g.x,sy:g.y,dx:0,dy:0,color:g.c,colorHex:g.hc,mode:g.m,frightened:false,spd:ghostBaseSpd,pt:null,gc:g.x,gr:g.y});
+}
+function lvlUp(){
+  level++;correct=0;paused=true;
+  document.getElementById('nlv').textContent=level;
+  document.getElementById('lvlOv').classList.add('on');
+  setTimeout(()=>{document.getElementById('lvlOv').classList.remove('on');initLvl();paused=false;},1500);
+}
+function initLvl(){
+  const mi=Math.min(level-1,MAZES.length-1);
+  maze=JSON.parse(JSON.stringify(MAZES[mi]));
+  dots=[];
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const v=maze[r][c];
+    if(v>=2)dots.push({c,r,type:v,eaten:false,pulseVal:Math.random()*6});
+  }
+  px=1;py=1;player.x=px*T;player.y=py*T;pdir={x:0,y:0};ndir={x:0,y:0};
+  resetGhosts();moveT=0;mtmr=0;mouth=true;updHUD();
+}
+function showWin(){running=false;document.getElementById('ws').textContent=score;document.getElementById('winOv').classList.add('on');}
+
+// ===== START =====
+function go(){
+  document.getElementById('startOv').classList.remove('on');
+  score=0;level=1;lives=3;correct=0;usedQ=[];ghEaten=false;paused=false;
+  initLvl();running=true;
+}
+function restart(){
+  ['overOv','winOv','lvlOv','quizOv'].forEach(id=>document.getElementById(id).classList.remove('on'));
+  score=0;level=1;lives=3;correct=0;usedQ=[];paused=false;ghEaten=false;
+  initLvl();running=true;
+}
+
+// ===== CONTROLS =====
+function onKey(e){
+  if(!running||paused)return;
+  switch(e.key){
+    case'ArrowUp':case'w':case'W':ndir={x:0,y:-1};e.preventDefault();break;
+    case'ArrowDown':case's':case'S':ndir={x:0,y:1};e.preventDefault();break;
+    case'ArrowLeft':case'a':case'A':ndir={x:-1,y:0};e.preventDefault();break;
+    case'ArrowRight':case'd':case'D':ndir={x:1,y:0};e.preventDefault();break;
+  }
+}
+
+// Mobile joystick
+let jActive=false,jx0=0,jy0=0;
+function setupJoystick(){
+  const jz=document.getElementById('joy'),jt=document.getElementById('joyT'),jb=document.getElementById('joyB');
+  jz.addEventListener('touchstart',e=>{e.preventDefault();const r=jb.getBoundingClientRect();jx0=r.left+r.width/2;jy0=r.top+r.height/2;jActive=true;},{passive:false});
+  jz.addEventListener('touchmove',e=>{
+    e.preventDefault();if(!jActive||!running||paused)return;
+    const t=e.touches[0];let dx=t.clientX-jx0,dy=t.clientY-jy0;
+    const mx=50,d=Math.sqrt(dx*dx+dy*dy);if(d>mx){dx=dx/d*mx;dy=dy/d*mx;}
+    jt.style.transform='translate('+dx+'px,'+dy+'px)';
+    if(d>15){if(Math.abs(dx)>Math.abs(dy))ndir={x:dx>0?1:-1,y:0};else ndir={x:0,y:dy>0?1:-1};}
+  },{passive:false});
+  jz.addEventListener('touchend',()=>{jActive=false;jt.style.transform='translate(0,0)';});
+}
+
+// ===== INIT ON LOAD =====
+init();
+</script>
+</body>
+</html>

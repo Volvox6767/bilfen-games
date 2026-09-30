@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>ROBİ 3D — Kovalamaca</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#05070d;
+    font-family:"Segoe UI", system-ui, -apple-system, sans-serif; color:#e8f1ff; user-select:none; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; pointer-events:none; display:none; }
+  #hud.on { display:block; }
+  .panel { position:absolute; background:rgba(8,14,26,.62); border:1px solid rgba(90,170,255,.28);
+    border-radius:14px; padding:10px 14px; backdrop-filter:blur(6px); box-shadow:0 6px 24px rgba(0,0,0,.4); }
+  #scorePanel { top:14px; left:14px; min-width:170px; }
+  #scorePanel .lbl { font-size:11px; letter-spacing:2px; color:#7fb2ff; text-transform:uppercase; }
+  #scoreVal { font-size:30px; font-weight:700; line-height:1.1; color:#fff;
+    text-shadow:0 0 14px rgba(90,180,255,.7); }
+  #bestVal { font-size:12px; color:#8ea8cc; margin-top:2px; }
+  #lifePanel { top:14px; right:14px; text-align:right; }
+  #hearts { font-size:22px; letter-spacing:3px; filter:drop-shadow(0 0 8px rgba(255,70,110,.8)); }
+  #waveVal { font-size:12px; color:#7fb2ff; margin-top:3px; letter-spacing:1px; }
+  #timerPanel { top:96px; left:14px; font-variant-numeric:tabular-nums; }
+  #timerVal { font-size:18px; font-weight:600; color:#ffd166; }
+  #dashWrap { position:absolute; bottom:22px; left:50%; transform:translateX(-50%);
+    width:210px; height:12px; background:rgba(8,14,26,.7); border:1px solid rgba(90,170,255,.35);
+    border-radius:8px; overflow:hidden; }
+  #dashBar { height:100%; width:100%; background:linear-gradient(90deg,#38e8ff,#7cffb2);
+    box-shadow:0 0 12px rgba(70,230,255,.8); transition:width .06s linear; }
+  #dashTxt { position:absolute; bottom:40px; left:50%; transform:translateX(-50%);
+    font-size:11px; letter-spacing:2px; color:#7fb2ff; text-transform:uppercase; }
+
+  /* ---------- Overlays ---------- */
+  .overlay { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; gap:14px; padding:24px;
+    background:radial-gradient(ellipse at 50% 40%, rgba(10,20,40,.72), rgba(3,5,10,.94));
+    z-index:20; }
+  .overlay.hidden { display:none; }
+  h1 { font-size:clamp(30px,7vw,62px); font-weight:800; letter-spacing:2px;
+    background:linear-gradient(90deg,#54e0ff,#7cffb2,#ffd166);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  h2 { font-size:clamp(22px,5vw,40px); font-weight:700; color:#fff; }
+  .sub { font-size:15px; color:#9fb6d8; max-width:560px; line-height:1.6; }
+  .keys { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:4px; }
+  .key { background:rgba(20,32,56,.85); border:1px solid rgba(90,170,255,.35); border-radius:10px;
+    padding:8px 13px; font-size:13px; color:#cfe4ff; }
+  .key b { color:#54e0ff; }
+  .btn { pointer-events:auto; cursor:pointer; border:none; border-radius:999px;
+    padding:15px 44px; font-size:18px; font-weight:700; letter-spacing:1px; color:#04121e;
+    background:linear-gradient(90deg,#54e0ff,#7cffb2); box-shadow:0 8px 30px rgba(60,200,255,.35);
+    transition:transform .12s ease, box-shadow .12s ease; }
+  .btn:hover { transform:translateY(-2px) scale(1.03); box-shadow:0 12px 36px rgba(60,200,255,.5); }
+  .btn:active { transform:scale(.97); }
+  #finalScore { font-size:52px; font-weight:800; color:#ffd166; text-shadow:0 0 24px rgba(255,200,80,.5); }
+  .stats { display:flex; gap:26px; flex-wrap:wrap; justify-content:center; }
+  .stat { background:rgba(14,24,44,.8); border:1px solid rgba(90,170,255,.25);
+    border-radius:12px; padding:10px 18px; min-width:120px; }
+  .stat .k { font-size:11px; letter-spacing:1.5px; color:#7fb2ff; text-transform:uppercase; }
+  .stat .v { font-size:22px; font-weight:700; margin-top:2px; }
+
+  /* ---------- Loader ---------- */
+  #loader { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:18px; background:#05070d; z-index:40; }
+  #loader.hidden { display:none; }
+  .ring { width:56px; height:56px; border-radius:50%; border:4px solid rgba(90,170,255,.18);
+    border-top-color:#54e0ff; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loadTxt { font-size:13px; letter-spacing:2px; color:#7fb2ff; }
+  #loadBar { width:240px; height:6px; background:rgba(90,170,255,.15); border-radius:4px; overflow:hidden; }
+  #loadFill { height:100%; width:0%; background:linear-gradient(90deg,#54e0ff,#7cffb2); transition:width .2s; }
+
+  /* ---------- Toast ---------- */
+  #toast { position:fixed; top:26%; left:50%; transform:translateX(-50%); font-size:26px;
+    font-weight:800; letter-spacing:1px; color:#7cffb2; text-shadow:0 0 18px rgba(80,255,170,.7);
+    opacity:0; pointer-events:none; z-index:15; transition:opacity .25s, transform .25s; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(-10px); }
+
+  /* ---------- Mobile joystick ---------- */
+  #stick { position:fixed; width:120px; height:120px; border-radius:50%; display:none;
+    border:2px solid rgba(90,170,255,.5); background:rgba(20,40,70,.35); z-index:12; pointer-events:none; }
+  #stickKnob { position:absolute; left:50%; top:50%; width:52px; height:52px; margin:-26px 0 0 -26px;
+    border-radius:50%; background:rgba(84,224,255,.75); box-shadow:0 0 16px rgba(84,224,255,.7); }
+  #dashBtn { position:fixed; right:26px; bottom:34px; width:88px; height:88px; border-radius:50%;
+    display:none; align-items:center; justify-content:center; font-size:13px; font-weight:800;
+    letter-spacing:1px; color:#04121e; background:linear-gradient(135deg,#54e0ff,#7cffb2);
+    box-shadow:0 6px 24px rgba(60,200,255,.45); z-index:13; border:none; }
+  body.touch #dashBtn { display:flex; }
+  body.touch #dashTxt { bottom:130px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud">
+  <div class="panel" id="scorePanel">
+    <div class="lbl">Skor</div>
+    <div id="scoreVal">0</div>
+    <div id="bestVal">Rekor: 0</div>
+  </div>
+  <div class="panel" id="lifePanel">
+    <div id="hearts">❤❤❤</div>
+    <div id="waveVal">DALGA 1</div>
+  </div>
+  <div class="panel" id="timerPanel"><span id="timerVal">00:00</span></div>
+  <div id="dashTxt">Boşluk — Dash</div>
+  <div id="dashWrap"><div id="dashBar"></div></div>
+</div>
+
+<div id="toast"></div>
+<div id="stick"><div id="stickKnob"></div></div>
+<button id="dashBtn">DASH</button>
+
+<div id="loader">
+  <div class="ring"></div>
+  <div id="loadTxt">MODEL YÜKLENİYOR</div>
+  <div id="loadBar"><div id="loadFill"></div></div>
+</div>
+
+<div class="overlay" id="menu">
+  <h1>ROBİ 3D — KOVALAMACA</h1>
+  <p class="sub">
+    Kırmızı robotlar seni yakalamak istiyor! Alanın içinde koş, onları atlat,
+    altın küreleri topla ve mümkün olduğunca hayatta kal. Her dalgada düşmanlar hızlanır.
+  </p>
+  <div class="keys">
+    <div class="key"><b>W A S D</b> / Ok tuşları — Koş</div>
+    <div class="key"><b>Boşluk</b> — Dash (kısa süreli hız)</div>
+    <div class="key"><b>P</b> — Duraklat</div>
+    <div class="key"><b>R</b> — Yeniden başla</div>
+  </div>
+  <button class="btn" id="startBtn">BAŞLA</button>
+</div>
+
+<div class="overlay hidden" id="pause">
+  <h2>DURAKLADI</h2>
+  <p class="sub">Devam etmek için <b>P</b> tuşuna bas.</p>
+  <button class="btn" id="resumeBtn">DEVAM ET</button>
+</div>
+
+<div class="overlay hidden" id="gameover">
+  <h2>YAKALANDIN!</h2>
+  <div id="finalScore">0</div>
+  <div class="stats">
+    <div class="stat"><div class="k">Süre</div><div class="v" id="goTime">00:00</div></div>
+    <div class="stat"><div class="k">Toplanan</div><div class="v" id="goOrbs">0</div></div>
+    <div class="stat"><div class="k">Dalga</div><div class="v" id="goWave">1</div></div>
+    <div class="stat"><div class="k">Rekor</div><div class="v" id="goBest">0</div></div>
+  </div>
+  <button class="btn" id="againBtn">TEKRAR OYNA</button>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from './lib/three/examples/jsm/loaders/GLTFLoader.js';
+import { clone as skeletonClone } from './lib/three/examples/jsm/utils/SkeletonUtils.js';
+
+/* =========================================================
+   AYARLAR
+   ========================================================= */
+const CFG = {
+  arenaR: 34,
+  playerSpeed: 11,
+  dashSpeed: 27,
+  dashTime: 0.22,
+  dashCooldown: 1.6,
+  enemyBase: 5.6,
+  enemyPerWave: 1,
+  waveTime: 20,
+  orbScore: 50,
+  startLives: 3,
+  playerR: 0.95,
+  enemyR: 0.95,
+  charScale: 3.2,       // model 1 birim boyunda -> 3.2 birim
+};
+
+const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+if (IS_TOUCH) document.body.classList.add('touch');
+
+const $ = (id) => document.getElementById(id);
+const ui = {
+  hud:$('hud'), score:$('scoreVal'), best:$('bestVal'), hearts:$('hearts'),
+  wave:$('waveVal'), timer:$('timerVal'), dash:$('dashBar'),
+  menu:$('menu'), pause:$('pause'), over:$('gameover'), loader:$('loader'),
+  loadFill:$('loadFill'), loadTxt:$('loadTxt'), toast:$('toast'),
+  finalScore:$('finalScore'), goTime:$('goTime'), goOrbs:$('goOrbs'),
+  goWave:$('goWave'), goBest:$('goBest'),
+};
+
+/* =========================================================
+   SAHNE
+   ========================================================= */
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+$('app').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070d);
+scene.fog = new THREE.Fog(0x05070d, 60, 140);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 400);
+const CAM_OFFSET = new THREE.Vector3(0, 15, 17);
+camera.position.copy(CAM_OFFSET);
+camera.lookAt(0, 0, 0);
+
+scene.add(new THREE.HemisphereLight(0x88bbff, 0x0a1020, 0.8));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(30, 52, 22);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 160;
+sun.shadow.camera.left = -55; sun.shadow.camera.right = 55;
+sun.shadow.camera.top = 55; sun.shadow.camera.bottom = -55;
+sun.shadow.bias = -0.0008;
+scene.add(sun);
+const rim = new THREE.DirectionalLight(0x4fa8ff, 0.6);
+rim.position.set(-32, 20, -28);
+scene.add(rim);
+
+/* =========================================================
+   ARENA
+   ========================================================= */
+function groundTexture() {
+  const s = 512, c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d');
+  g.fillStyle = '#0a1220'; g.fillRect(0,0,s,s);
+  g.strokeStyle = 'rgba(70,140,240,.30)'; g.lineWidth = 3;
+  g.strokeRect(1.5,1.5,s-3,s-3);
+  g.strokeStyle = 'rgba(70,140,240,.12)'; g.lineWidth = 2;
+  for (let i=1;i<4;i++){
+    g.beginPath(); g.moveTo(i*s/4,0); g.lineTo(i*s/4,s); g.stroke();
+    g.beginPath(); g.moveTo(0,i*s/4); g.lineTo(s,i*s/4); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(14,14);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(CFG.arenaR, 96),
+  new THREE.MeshStandardMaterial({ map: groundTexture(), roughness:.92, metalness:.05, color:0xc6daff })
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const voidPlane = new THREE.Mesh(
+  new THREE.CircleGeometry(220, 64),
+  new THREE.MeshBasicMaterial({ color:0x03050a })
+);
+voidPlane.rotation.x = -Math.PI/2; voidPlane.position.y = -0.15;
+scene.add(voidPlane);
+
+const ringMesh = new THREE.Mesh(
+  new THREE.TorusGeometry(CFG.arenaR, 0.35, 12, 160),
+  new THREE.MeshStandardMaterial({ color:0x0c1a30, emissive:0x2f8fff,
+    emissiveIntensity:1.7, roughness:.4, metalness:.3 })
+);
+ringMesh.rotation.x = -Math.PI/2; ringMesh.position.y = 0.35;
+scene.add(ringMesh);
+
+const postGeo = new THREE.CylinderGeometry(0.22, 0.28, 3.6, 8);
+const postMat = new THREE.MeshStandardMaterial({ color:0x12233d, emissive:0x1b6bd6,
+  emissiveIntensity:1.0, roughness:.5, metalness:.4 });
+const POSTS = 30;
+const posts = new THREE.InstancedMesh(postGeo, postMat, POSTS);
+{
+  const m = new THREE.Matrix4();
+  for (let i=0;i<POSTS;i++){
+    const a = i/POSTS * Math.PI*2;
+    m.makeTranslation(Math.cos(a)*(CFG.arenaR+0.7), 1.8, Math.sin(a)*(CFG.arenaR+0.7));
+    posts.setMatrixAt(i, m);
+  }
+  posts.instanceMatrix.needsUpdate = true;
+}
+scene.add(posts);
+
+// dairesel engeller (sığınak kolonları)
+const obstacles = [];
+const colGeo = new THREE.CylinderGeometry(1.0, 1.3, 5.2, 16);
+const colMat = new THREE.MeshStandardMaterial({ color:0x16304f, roughness:.6, metalness:.35,
+  emissive:0x0b2b52, emissiveIntensity:.7 });
+const capGeo = new THREE.TorusGeometry(1.05, 0.1, 8, 26);
+const capMat = new THREE.MeshStandardMaterial({ color:0x0a1a2e, emissive:0x35d0ff,
+  emissiveIntensity:1.6, roughness:.4 });
+const OB_DEFS = [
+  [14, 10], [-15, 8], [6, -16], [-8, -13], [20, -6], [-21, -4],
+  [0, 18], [10, 20], [-12, 20], [18, 14], [-20, 16], [2, -24],
+  [-4, 4], [16, 2], [-16, -18], [24, -16]
+];
+for (const [x,z] of OB_DEFS) {
+  if (Math.hypot(x,z) > CFG.arenaR - 3) continue;
+  const col = new THREE.Mesh(colGeo, colMat);
+  col.position.set(x, 2.6, z);
+  col.castShadow = true; col.receiveShadow = true;
+  scene.add(col);
+  const cap = new THREE.Mesh(capGeo, capMat);
+  cap.rotation.x = Math.PI/2;
+  cap.position.set(x, 5.1, z);
+  scene.add(cap);
+  obstacles.push({ x, z, r: 1.55 });
+}
+
+/* =========================================================
+   MODEL YÜKLEME
+   ========================================================= */
+const loader = new GLTFLoader();
+function loadGLTF(url, onProgress) {
+  return new Promise((res, rej) => loader.load(url, res, onProgress, rej));
+}
+
+let playerMesh = null;
+let playerActor = null;
+const enemyProto = { hq:null, lq:null };
+const clock = new THREE.Clock();
+
+async function boot() {
+  ui.loadTxt.textContent = 'MODEL YÜKLENİYOR (0/2)';
+  const p1 = await loadGLTF('./model-hq.glb', (e)=>{
+    if (e.total) ui.loadFill.style.width = (e.loaded/e.total*50) + '%';
+  });
+  ui.loadTxt.textContent = 'MODEL YÜKLENİYOR (1/2)';
+  const p2 = await loadGLTF('./model-lq.glb', (e)=>{
+    if (e.total) ui.loadFill.style.width = (50 + e.loaded/e.total*50) + '%';
+  });
+  ui.loadFill.style.width = '100%';
+
+  enemyProto.hq = prepareModel(p1, 0xdff0ff);
+  enemyProto.lq = prepareModel(p2, 0xdff0ff);
+
+  // oyuncu: HQ
+  playerMesh = cloneWithColor(enemyProto.hq, 0x35e0ff, 0x0a4a5e);
+  scene.add(playerMesh);
+  playerActor = makeActor(playerMesh);
+
+  ui.loadTxt.textContent = 'HAZIR';
+  setTimeout(()=> ui.loader.classList.add('hidden'), 250);
+  animate();
+}
+
+function prepareModel(gltf, color) {
+  const root = gltf.scene;
+  root.traverse(o => {
+    if (o.isMesh) {
+      o.castShadow = true;
+      o.receiveShadow = true;
+      if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+      o.geometry.computeBoundingBox();
+      o.material = new THREE.MeshStandardMaterial({
+        color, roughness:.55, metalness:.25, flatShading:false
+      });
+    }
+  });
+  // tabanı y=0'a oturt + ölçekle
+  const bb = new THREE.Box3().setFromObject(root);
+  const h = bb.max.y - bb.min.y;
+  const scale = CFG.charScale / h;
+  const wrap = new THREE.Group();
+  root.position.y = -bb.min.y;
+  root.scale.setScalar(1);
+  wrap.add(root);
+  wrap.scale.setScalar(scale);
+  wrap.updateMatrixWorld(true);
+  return wrap;
+}
+
+function cloneWithColor(proto, color, emissive) {
+  const g = skeletonClone(proto);   // skeleton'ı doğru kopyalar
+  const mats = [];
+  g.traverse(o => {
+    if (o.isMesh) {
+      o.material = o.material.clone();
+      o.material.color = new THREE.Color(color);
+      o.material.emissive = new THREE.Color(emissive || 0x000000);
+      o.material.emissiveIntensity = emissive ? 0.55 : 0;
+      o.castShadow = true;
+      mats.push(o.material);
+    }
+  });
+  g.userData.mats = mats;
+  return g;
+}
+
+/* =========================================================
+   PROSEDÜREL ANİMASYON (iskelet)
+   ========================================================= */
+const BONE_NAMES = ['Hips','Spine','Head','LeftUpLeg','LeftLeg','LeftFoot',
+                    'RightUpLeg','RightLeg','RightFoot'];
+
+function makeActor(mesh) {
+  const bones = {};
+  mesh.traverse(o => { if (BONE_NAMES.includes(o.name)) bones[o.name] = o; });
+  const ok = BONE_NAMES.every(n => bones[n]);
+  return { mesh, bones: ok ? bones : null, phase: Math.random()*Math.PI*2,
+           sm: 0, mats: mesh.userData.mats || [] };
+}
+
+// speed: dünya birimi/sn, dash: 0..1
+// faz sırası: f=pi  -> topuk değme (ayak en önde, yere iner)
+//              f=3pi/2 -> orta destek, f=2pi -> itiş (ayak en arkada)
+//              f=0..pi -> havada ileri geliyor (swng)
+function animateActor(a, dt, speed, dash) {
+  if (!a.bones) return;
+  const b = a.bones;
+  const t = performance.now()*0.001 + a.phase*10;   // idle zaman
+
+  // yürüyüş tempoyu hıza bağla: 1 adım ~ 1.9 birim
+  const sp = Math.max(0, Math.min(speed, 30));
+  a.sm += (sp - a.sm) * Math.min(1, dt*8);          // yumuşak hedef
+  const run = Math.min(1, a.sm / CFG.playerSpeed);  // 0=durağan, 1=tempo
+  const strideLen = 1.9;
+  a.phase += dt * (a.sm / strideLen) * Math.PI;     // her adım pi radyan
+  const gait = Math.min(1, a.sm / 3.5);             // 0=durağan -> adım yok
+
+  const f = a.phase;
+  const sinf = Math.sin(f), cosf = Math.cos(f);
+
+  const swing  = (0.16 + 0.50*run + 0.22*dash) * gait;  // uyluk genliği (rad)
+  const kneeA  = (0.55 + 0.85*run + 0.40*dash) * gait;  // diz genliği
+  const footA  = (0.18 + 0.30*run) * gait;
+  const lean   = 0.06 + 0.34*run + 0.38*dash;           // öne eğilme
+  const bobA   = (0.010 + 0.045*run + 0.030*dash) * gait;
+
+  // --- bacaklar ---
+  // theta>0 -> ayak geriye (-z); theta<0 -> ayak öne (+z)
+  const thL = -swing * sinf;
+  const thR =  swing * sinf;                 // sag = sol + pi
+  b.LeftUpLeg.rotation.x  = thL;
+  b.RightUpLeg.rotation.x = thR;
+
+  // diz: havada maksimum büküm (f=pi/2 civarı), basış sonrası hafif amortisman
+  const kneeBase = 0.07 * (1 - gait*0.5);
+  const kneeL = kneeBase + kneeA * Math.max(0, sinf)
+              + kneeA * 0.30 * Math.max(0, -cosf);
+  const kneeR = kneeBase + kneeA * Math.max(0, -sinf)
+              + kneeA * 0.30 * Math.max(0, cosf);
+  b.LeftLeg.rotation.x  = kneeL;
+  b.RightLeg.rotation.x = kneeR;
+
+  // ayak: basışta parmak yukarı (f=pi), itişte parmak aşağı (f=0)
+  b.LeftFoot.rotation.x  = 0.05 + footA * cosf;
+  b.RightFoot.rotation.x = 0.05 - footA * cosf;
+
+  // --- gövde ---
+  b.Hips.rotation.x = lean;                        // öne eğilme
+  b.Hips.rotation.z = 0.05 * sinf * gait;          // kalça yatma
+  b.Hips.position.y = SEG_HIPS_Y + bobA * Math.sin(2*f);
+  b.Spine.rotation.x = -0.10*lean + 0.04*Math.sin(t*1.4)*(1-run);   // nefes
+  b.Spine.rotation.y = 0.12 * sinf * (0.25 + 0.75*run);   // omuz karşılıklı dönüş
+  b.Spine.rotation.z = -0.05 * sinf * gait;
+  // baş: gövde sallanmasını dengeler + idle'da etrafa bakınma
+  b.Head.rotation.x = -lean*0.85 + 0.05*Math.sin(t*1.1)*(1-run);
+  b.Head.rotation.y = -b.Spine.rotation.y * 0.55 + 0.14*Math.sin(t*0.55)*(1-run);
+  b.Head.rotation.z = -b.Spine.rotation.z * 0.85;
+}
+
+const SEG_HIPS_Y = 0.140;
+
+/* =========================================================
+   OYUN DURUMU
+   ========================================================= */
+const STATE = { MENU:0, PLAY:1, PAUSE:2, OVER:3 };
+let state = STATE.MENU;
+
+const player = {
+  pos: new THREE.Vector3(0, 0, 0),
+  dir: new THREE.Vector3(0, 0, 1),
+  vel: new THREE.Vector3(),
+  lives: CFG.startLives,
+  invuln: 0,
+  dashT: 0,
+  dashCd: 0,
+  bob: 0,
+};
+
+let enemies = [];
+let orbs = [];
+let score = 0, best = 0, collected = 0, wave = 1, waveT = 0, elapsed = 0;
+let spawnQueue = 0, spawnT = 0;
+try { best = parseInt(localStorage.getItem('robichase3d_best') || '0', 10) || 0; } catch(e) {}
+ui.best.textContent = 'Rekor: ' + best;
+
+const keys = {};
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space') { e.preventDefault(); tryDash(); }
+  if (e.code === 'KeyP') togglePause();
+  if (e.code === 'KeyR' && state !== STATE.PLAY) startGame();
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+/* ---------- joystick ---------- */
+const stick = { active:false, id:null, cx:0, cy:0, dx:0, dy:0 };
+const stickEl = $('stick'), knobEl = $('stickKnob');
+function stickStart(x, y) {
+  stick.active = true; stick.cx = x; stick.cy = y; stick.dx = stick.dy = 0;
+  stickEl.style.display = 'block';
+  stickEl.style.left = (x-60)+'px'; stickEl.style.top = (y-60)+'px';
+  knobEl.style.transform = 'translate(0,0)';
+}
+function stickMove(x, y) {
+  let dx = x - stick.cx, dy = y - stick.cy;
+  const d = Math.hypot(dx, dy), max = 52;
+  if (d > max) { dx = dx/d*max; dy = dy/d*max; }
+  stick.dx = dx/max; stick.dy = dy/max;
+  knobEl.style.transform = `translate(${dx}px,${dy}px)`;
+}
+function stickEnd() { stick.active = false; stickEl.style.display = 'none'; }
+
+if (IS_TOUCH) {
+  addEventListener('touchstart', e => {
+    for (const t of e.changedTouches) {
+      if (t.target && t.target.closest && t.target.closest('#dashBtn')) continue;
+      if (t.clientX < innerWidth*0.6 && !stick.active) { stick.id = t.identifier; stickStart(t.clientX, t.clientY); }
+    }
+  }, {passive:true});
+  addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) {
+      if (stick.active && t.identifier === stick.id) stickMove(t.clientX, t.clientY);
+    }
+  }, {passive:true});
+  addEventListener('touchend', e => {
+    for (const t of e.changedTouches) if (stick.active && t.identifier === stick.id) stickEnd();
+  }, {passive:true});
+  addEventListener('touchcancel', () => { if (stick.active) stickEnd(); }, {passive:true});
+  $('dashBtn').addEventListener('touchstart', e => { e.preventDefault(); tryDash(); }, {passive:false});
+}
+
+/* =========================================================
+   OYUN AKIŞI
+   ========================================================= */
+function toast(msg) {
+  ui.toast.textContent = msg;
+  ui.toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=> ui.toast.classList.remove('show'), 1200);
+}
+
+function startGame() {
+  // temizle
+  for (const e of enemies) scene.remove(e.mesh);
+  for (const o of orbs) scene.remove(o.mesh);
+  enemies = []; orbs = [];
+  score = 0; collected = 0; wave = 1; waveT = 0; elapsed = 0;
+  spawnQueue = 0; spawnT = 1.2;
+  player.pos.set(0,0,0); player.vel.set(0,0,0); player.dir.set(0,0,1);
+  player.lives = CFG.startLives; player.invuln = 3.0;   // başlangıç toleransı
+  player.dashT = 0; player.dashCd = 0;
+  if (playerMesh) playerMesh.position.copy(player.pos);
+  if (playerActor) { playerActor.phase = Math.PI; playerActor.sm = 0; }  // ayakta duruş fazı
+
+  state = STATE.PLAY;
+  ui.menu.classList.add('hidden');
+  ui.pause.classList.add('hidden');
+  ui.over.classList.add('hidden');
+  ui.hud.classList.add('on');
+  updateHUD();
+  spawnWave();
+  for (let i=0;i<5;i++) spawnOrb();
+  toast('KOŞ!');
+}
+
+function spawnWave() {
+  const n = 1 + (wave-1)*CFG.enemyPerWave;
+  spawnQueue += Math.min(n, 9);
+  ui.wave.textContent = 'DALGA ' + wave;
+  toast('DALGA ' + wave);
+}
+
+function spawnEnemy() {
+  const proto = enemies.length < 2 ? enemyProto.hq : enemyProto.lq;
+  const mesh = cloneWithColor(proto, 0xff4d5e, 0x6b0d18);
+  const a = Math.random()*Math.PI*2;
+  const r = CFG.arenaR - 4 - Math.random()*4;
+  const p = new THREE.Vector3(Math.cos(a)*r, 0, Math.sin(a)*r);
+  mesh.position.copy(p);
+  scene.add(mesh);
+  const act = makeActor(mesh);
+  enemies.push({
+    mesh, actor: act, pos:p, vel:new THREE.Vector3(),
+    speed: CFG.enemyBase + (wave-1)*0.55 + Math.random()*0.7,
+    face: a, bob: Math.random()*6.28,
+  });
+}
+
+function spawnOrb() {
+  const geo = new THREE.IcosahedronGeometry(0.55, 1);
+  const mat = new THREE.MeshStandardMaterial({ color:0xffd166, emissive:0xffa400,
+    emissiveIntensity:1.5, roughness:.3, metalness:.5 });
+  const mesh = new THREE.Mesh(geo, mat);
+  const light = new THREE.PointLight(0xffb347, 6, 9, 2);
+  mesh.add(light);
+  let x=0, z=0, tries=0;
+  do {
+    const a = Math.random()*Math.PI*2, r = Math.random()*(CFG.arenaR-5);
+    x = Math.cos(a)*r; z = Math.sin(a)*r;
+    tries++;
+  } while (tries < 30 && (Math.hypot(x-player.pos.x, z-player.pos.z) < 6 ||
+           obstacles.some(o => Math.hypot(x-o.x, z-o.z) < o.r+2)));
+  mesh.position.set(x, 1.2, z);
+  scene.add(mesh);
+  orbs.push({ mesh, x, z, t: Math.random()*6.28 });
+}
+
+function tryDash() {
+  if (state !== STATE.PLAY) return;
+  if (player.dashCd > 0 || player.dashT > 0) return;
+  player.dashT = CFG.dashTime;
+  player.dashCd = CFG.dashCooldown;
+}
+
+function togglePause() {
+  if (state === STATE.PLAY) {
+    state = STATE.PAUSE;
+    ui.pause.classList.remove('hidden');
+  } else if (state === STATE.PAUSE) {
+    state = STATE.PLAY;
+    ui.pause.classList.add('hidden');
+  }
+}
+
+function gameOver() {
+  state = STATE.OVER;
+  score = Math.floor(score);
+  if (score > best) {
+    best = score;
+    try { localStorage.setItem('robichase3d_best', String(best)); } catch(e) {}
+  }
+  ui.finalScore.textContent = Math.floor(score);
+  ui.goTime.textContent = fmt(elapsed);
+  ui.goOrbs.textContent = collected;
+  ui.goWave.textContent = wave;
+  ui.goBest.textContent = best;
+  ui.over.classList.remove('hidden');
+  ui.hud.classList.remove('on');
+}
+
+function fmt(t) {
+  const m = Math.floor(t/60), s = Math.floor(t%60);
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+function updateHUD() {
+  ui.score.textContent = Math.floor(score);
+  ui.best.textContent = 'Rekor: ' + best;
+  ui.hearts.textContent = '❤'.repeat(Math.max(0,player.lives)) +
+    '🖤'.repeat(Math.max(0, CFG.startLives - player.lives));
+  ui.timer.textContent = fmt(elapsed);
+  const cd = 1 - player.dashCd/CFG.dashCooldown;
+  ui.dash.style.width = (Math.max(0, Math.min(1, cd))*100) + '%';
+}
+
+/* =========================================================
+   GÜNCELLEME
+   ========================================================= */
+const camPos = new THREE.Vector3().copy(CAM_OFFSET);
+const camTarget = new THREE.Vector3();
+
+function moveCircle(pos, dx, dz, radius) {
+  pos.x += dx; pos.z += dz;
+  // engeller
+  for (const o of obstacles) {
+    const ddx = pos.x - o.x, ddz = pos.z - o.z;
+    const d = Math.hypot(ddx, ddz), min = o.r + radius;
+    if (d < min && d > 0.0001) {
+      pos.x = o.x + ddx/d*min;
+      pos.z = o.z + ddz/d*min;
+    }
+  }
+  // arena sınırı
+  const lim = CFG.arenaR - radius;
+  const d = Math.hypot(pos.x, pos.z);
+  if (d > lim) { pos.x = pos.x/d*lim; pos.z = pos.z/d*lim; }
+}
+
+function update(dt) {
+  elapsed += dt;
+  waveT += dt;
+  if (waveT >= CFG.waveTime) { waveT = 0; wave++; spawnWave(); }
+
+  if (spawnQueue > 0) {
+    spawnT -= dt;
+    if (spawnT <= 0) { spawnEnemy(); spawnQueue--; spawnT = 1.6; }
+  }
+
+  /* --- oyuncu --- */
+  let ix = 0, iz = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) iz -= 1;
+  if (keys['KeyS'] || keys['ArrowDown']) iz += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
+  if (stick.active) { ix += stick.dx; iz += stick.dy; }
+
+  const camFwd = new THREE.Vector3();   // kameradan bakış yönü (yer düzlemi)
+  camera.getWorldDirection(camFwd);
+  camFwd.y = 0; camFwd.normalize();
+  const camRight = new THREE.Vector3(-camFwd.z, 0, camFwd.x);
+
+  const want = new THREE.Vector3()
+    .addScaledVector(camRight, ix)
+    .addScaledVector(camFwd, -iz);
+  const wl = want.length();
+  if (wl > 1) want.divideScalar(wl);
+  if (wl > 0.05) player.dir.lerp(want.clone().normalize(), Math.min(1, dt*10)).normalize();
+
+  if (player.dashCd > 0) player.dashCd -= dt;
+  if (player.dashT > 0) player.dashT -= dt;
+
+  const speed = player.dashT > 0 ? CFG.dashSpeed : CFG.playerSpeed;
+  const target = want.multiplyScalar(wl > 0.05 ? speed : 0);
+  player.vel.lerp(target, Math.min(1, dt*12));
+  moveCircle(player.pos, player.vel.x*dt, player.vel.z*dt, CFG.playerR);
+
+  if (player.invuln > 0) player.invuln -= dt;
+
+  if (playerMesh) {
+    playerMesh.position.copy(player.pos);
+    if (player.dir.lengthSq() > 0.001) {
+      const yaw = Math.atan2(player.dir.x, player.dir.z);
+      playerMesh.rotation.y = lerpAngle(playerMesh.rotation.y, yaw, Math.min(1, dt*12));
+    }
+    // dash parlaması
+    const flashing = player.invuln > 0 && Math.floor(player.invuln*12) % 2 === 0;
+    playerMesh.visible = !flashing;
+    const em = player.dashT > 0 ? 1.2 : 0.35;
+    if (playerActor) {
+      for (const m of playerActor.mats) m.emissiveIntensity = em;
+      animateActor(playerActor, dt, player.vel.length(), player.dashT > 0 ? 1 : 0);
+    }
+  }
+
+  /* --- düşmanlar --- */
+  for (const e of enemies) {
+    const to = new THREE.Vector3(player.pos.x - e.pos.x, 0, player.pos.z - e.pos.z);
+    const dist = to.length();
+    if (dist > 0.001) to.divideScalar(dist);
+
+    // diğer düşmanlardan kaçın
+    const sep = new THREE.Vector3();
+    for (const o of enemies) {
+      if (o === e) continue;
+      const dx = e.pos.x - o.pos.x, dz = e.pos.z - o.pos.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 3.4 && d > 0.001) sep.add(new THREE.Vector3(dx/d, 0, dz/d).multiplyScalar((3.4-d)/3.4));
+    }
+    // engellerden hafif kaçınma
+    const avoid = new THREE.Vector3();
+    for (const o of obstacles) {
+      const dx = e.pos.x - o.x, dz = e.pos.z - o.z;
+      const d = Math.hypot(dx, dz);
+      if (d < o.r + 4 && d > 0.001) avoid.add(new THREE.Vector3(dx/d, 0, dz/d).multiplyScalar((o.r+4-d)/4));
+    }
+
+    const desired = to.clone().add(sep.multiplyScalar(1.5)).add(avoid.multiplyScalar(2.0));
+    if (desired.lengthSq() > 0.0001) desired.normalize();
+    e.vel.lerp(desired.multiplyScalar(e.speed), Math.min(1, dt*4));
+    moveCircle(e.pos, e.vel.x*dt, e.vel.z*dt, CFG.enemyR);
+
+    // hafif "kuşatma" yayı: çok yakınlarda biraz yana savrul
+    if (dist < 2.6) {
+      const side = new THREE.Vector3(-to.z, 0, to.x).multiplyScalar(Math.sin(elapsed*2 + e.bob) * 2.2);
+      moveCircle(e.pos, side.x*dt, side.z*dt, CFG.enemyR);
+    }
+
+    e.mesh.position.copy(e.pos);
+    if (e.vel.lengthSq() > 0.02) {
+      const yaw = Math.atan2(e.vel.x, e.vel.z);
+      e.mesh.rotation.y = lerpAngle(e.mesh.rotation.y, yaw, Math.min(1, dt*8));
+    }
+    animateActor(e.actor, dt, e.vel.length(), 0);
+
+    // yakalama
+    if (player.invuln <= 0 &&
+        Math.hypot(player.pos.x-e.pos.x, player.pos.z-e.pos.z) < CFG.playerR + CFG.enemyR - 0.35) {
+      player.lives--;
+      player.invuln = 2.0;
+      // düşmanları geri savur
+      for (const o of enemies) {
+        const dx = o.pos.x - player.pos.x, dz = o.pos.z - player.pos.z;
+        const d = Math.hypot(dx, dz) || 1;
+        const push = Math.max(0, 9 - d);
+        moveCircle(o.pos, dx/d*push, dz/d*push, CFG.enemyR);
+      }
+      updateHUD();
+      if (player.lives <= 0) { gameOver(); return; }
+      toast('DİKKAT! -1 CAN');
+    }
+  }
+
+  /* --- küreler --- */
+  for (let i=orbs.length-1; i>=0; i--) {
+    const o = orbs[i];
+    o.t += dt;
+    o.mesh.rotation.y += dt*2.2;
+    o.mesh.rotation.x += dt*1.1;
+    o.mesh.position.y = 1.2 + Math.sin(o.t*2.4)*0.28;
+    if (Math.hypot(player.pos.x-o.x, player.pos.z-o.z) < 1.7) {
+      scene.remove(o.mesh);
+      orbs.splice(i,1);
+      score += CFG.orbScore;
+      collected++;
+      updateHUD();
+      spawnOrb();
+      if (collected % 5 === 0) toast('+' + CFG.orbScore + '  (x' + collected + ')');
+    }
+  }
+  if (orbs.length < 5 && Math.random() < dt*0.7) spawnOrb();
+
+  // pasif skor
+  score += dt * 2;
+  updateHUD();
+}
+
+function lerpAngle(a, b, t) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI*2;
+  while (d < -Math.PI) d += Math.PI*2;
+  return a + d*t;
+}
+
+/* =========================================================
+   KAMERA + DÖNGÜ
+   ========================================================= */
+function updateCamera(dt) {
+  camTarget.set(player.pos.x, 0, player.pos.z);
+  const desired = camTarget.clone().add(CAM_OFFSET);
+  camPos.lerp(desired, Math.min(1, dt*3.2));
+  camera.position.copy(camPos);
+  camera.lookAt(camTarget.x, 1.6, camTarget.z);
+}
+
+let acc = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if (state === STATE.PLAY) {
+    // alt adımlarla sabit fizik
+    acc += dt;
+    const step = 1/60;
+    let guard = 0;
+    while (acc >= step && guard < 5) { update(step); acc -= step; guard++; }
+    if (guard >= 5) acc = 0;
+  }
+
+  // küre animasyonu menüde de dönsün; menü/oyun sonunda karakterler duruşa geçsin
+  if (state !== STATE.PLAY) {
+    for (const o of orbs) { o.t += dt; o.mesh.rotation.y += dt*1.5; }
+    if (playerActor) animateActor(playerActor, dt, 0, 0);
+    if (state === STATE.OVER) for (const e of enemies) animateActor(e.actor, dt, 0, 0);
+  }
+
+  updateCamera(dt);
+  ringMesh.material.emissiveIntensity = 1.5 + Math.sin(performance.now()*0.002)*0.4;
+  renderer.render(scene, camera);
+}
+
+/* =========================================================
+   UI BAĞLANTILARI
+   ========================================================= */
+$('startBtn').addEventListener('click', startGame);
+$('againBtn').addEventListener('click', startGame);
+$('resumeBtn').addEventListener('click', togglePause);
+$('dashBtn').addEventListener('pointerdown', e => { e.preventDefault(); tryDash(); });
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+addEventListener('blur', () => { if (state === STATE.PLAY) togglePause(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state === STATE.PLAY) togglePause();
+});
+
+boot().catch(err => {
+  ui.loadTxt.textContent = 'HATA: ' + (err && err.message ? err.message : err);
+  ui.loadTxt.style.color = '#ff6b81';
+  console.error(err);
+});
+
+// test/debug köprüsü
+window.__game = {
+  get state(){ return state; },
+  get score(){ return Math.floor(score); },
+  get lives(){ return player.lives; },
+  get wave(){ return wave; },
+  get enemies(){ return enemies.length; },
+  get orbs(){ return orbs.length; },
+  get player(){ return {x:+player.pos.x.toFixed(2), z:+player.pos.z.toFixed(2)}; },
+  get enemyList(){ return enemies.map(e => ({x:+e.pos.x.toFixed(1), z:+e.pos.z.toFixed(1)})); },
+  get enemyAnims(){ return enemies.map(e => ({bones: !!e.actor.bones,
+    th: +e.actor.bones.LeftUpLeg.rotation.x.toFixed(3),
+    kn: +e.actor.bones.LeftLeg.rotation.x.toFixed(3),
+    ph: +e.actor.phase.toFixed(1), sm: +e.actor.sm.toFixed(1)})); },
+  get orbList(){ return orbs.map(o => ({x:+o.x.toFixed(1), z:+o.z.toFixed(1)})); },
+  get cam(){ return {x:+camera.position.x.toFixed(1), y:+camera.position.y.toFixed(1), z:+camera.position.z.toFixed(1)}; },
+  start: startGame, dash: tryDash,
+  tick(n = 60, dt = 1/60, speed = 11, dash = 0) {
+    for (let i = 0; i < n; i++) animateActor(playerActor, dt, speed, dash);
+    renderer.render(scene, camera);
+    return this.animInfo();
+  },
+  diag() {
+    let mesh = null, geo = null, bind = null, hips = null;
+    playerMesh.traverse(o => {
+      if (o.isSkinnedMesh) { mesh = o; geo = o.geometry; bind = o.skeleton; }
+      if (o.name === 'Hips') hips = o;
+    });
+    const bb = geo ? (geo.boundingBox || (geo.computeBoundingBox(), geo.boundingBox)) : null;
+    const box = new THREE.Box3().setFromObject(playerMesh);
+    const boxP = new THREE.Box3().setFromObject(playerMesh, true);
+    return {
+      wrapScale: playerMesh.scale.toArray().map(v=>+v.toFixed(3)),
+      wrapPos: playerMesh.position.toArray().map(v=>+v.toFixed(3)),
+      innerScale: playerMesh.children[0].scale.toArray().map(v=>+v.toFixed(3)),
+      innerPos: playerMesh.children[0].position.toArray().map(v=>+v.toFixed(3)),
+      geoBB: bb ? {min: bb.min.toArray().map(v=>+v.toFixed(3)), max: bb.max.toArray().map(v=>+v.toFixed(3))} : null,
+      worldBox: {min: box.min.toArray().map(v=>+v.toFixed(2)), max: box.max.toArray().map(v=>+v.toFixed(2))},
+      worldBoxPrecise: {min: boxP.min.toArray().map(v=>+v.toFixed(2)), max: boxP.max.toArray().map(v=>+v.toFixed(2))},
+      hipsWorld: hips ? hips.getWorldPosition(new THREE.Vector3()).toArray().map(v=>+v.toFixed(3)) : null,
+      bindMatrix: mesh ? mesh.bindMatrix.elements.slice(12,15).map(v=>+v.toFixed(3)) : null,
+      boneCount: bind ? bind.bones.length : 0,
+      isSkinned: !!(mesh && mesh.isSkinnedMesh),
+      meshScale: mesh ? mesh.scale.toArray().map(v=>+v.toFixed(3)) : null,
+      meshMatrixWS: mesh ? [1.098, 0, 0, 0, 0, 1.098, 0, 0, 0, 0, 1.098, 0].length &&
+        (() => { const e = mesh.matrixWorld.elements; return [e[0],e[5],e[10],e[13]].map(v=>+v.toFixed(3)); })() : null,
+      wrapMatrixScale: (() => { const e = playerMesh.matrixWorld.elements; return [e[0],e[5],e[10],e[13]].map(v=>+v.toFixed(3)); })(),
+      protoScale: enemyProto.hq ? enemyProto.hq.scale.x.toFixed(3) : null,
+      childCount: playerMesh.children[0] ? playerMesh.children[0].children.length : -1,
+      childNames: playerMesh.children[0] ? playerMesh.children[0].children.map(c=>c.name+':'+c.type+':'+(c.scale?c.scale.x.toFixed(2):'')) : [],
+    };
+  },
+  step(n = 60) { for (let i = 0; i < n && state === STATE.PLAY; i++) update(1/60); return this.animInfo(); },
+  render() { renderer.render(scene, camera); },
+  bench(nEnemies = 8, frames = 45) {
+    if (state !== STATE.PLAY) startGame();
+    while (enemies.length < nEnemies) spawnEnemy();
+    renderer.render(scene, camera);
+    const t0 = performance.now();
+    for (let i = 0; i < frames; i++) {
+      for (const e of enemies) animateActor(e.actor, 1/60, e.speed, 0);
+      renderer.render(scene, camera);
+    }
+    const ms = (performance.now() - t0) / frames;
+    return {enemies: enemies.length, msPerFrame: +ms.toFixed(2), estFps: +(1000/ms).toFixed(0)};
+  },
+  animInfo() {
+    if (!playerActor) return 'no actor';
+    const b = playerActor.bones;
+    if (!b) return 'NO BONES (rig eksik)';
+    return {
+      phase: +playerActor.phase.toFixed(2), sm: +playerActor.sm.toFixed(2),
+      bones: Object.keys(b).length,
+      lThigh: +b.LeftUpLeg.rotation.x.toFixed(3),
+      lKnee: +b.LeftLeg.rotation.x.toFixed(3),
+      rThigh: +b.RightUpLeg.rotation.x.toFixed(3),
+      rKnee: +b.RightLeg.rotation.x.toFixed(3),
+      hipsY: +b.Hips.position.y.toFixed(4),
+      lean: +b.Hips.rotation.x.toFixed(3),
+      headY: +b.Head.rotation.y.toFixed(3),
+    };
+  },
+  _pv(v) { if (playerMesh) playerMesh.visible = v; },
+  playerMesh() { return playerMesh; },
+  skinBoxes() {
+    let sm = null;
+    playerMesh.traverse(o => { if (o.isSkinnedMesh) sm = o; });
+    const pos = sm.geometry.attributes.position;
+    const v = new THREE.Vector3();
+    const f = b => ({min:b.min.toArray().map(n=>+n.toFixed(3)), max:b.max.toArray().map(n=>+n.toFixed(3))});
+    const raw = new THREE.Box3();
+    for (let i = 0; i < pos.count; i++) raw.expandByPoint(v.fromBufferAttribute(pos, i));
+    const idle = new THREE.Box3();
+    for (let i = 0; i < pos.count; i++) idle.expandByPoint(sm.getVertexPosition(i, v));
+    this.tick(45, 1/60, 11, 0);
+    const run = new THREE.Box3();
+    for (let i = 0; i < pos.count; i++) run.expandByPoint(sm.getVertexPosition(i, v));
+    return {raw: f(raw), idle: f(idle), run: f(run)};
+  },
+  probe() {
+    const toScreen = (x, y, z) => {
+      const v = new THREE.Vector3(x, y, z).project(camera);
+      return { x:+v.x.toFixed(2), y:+v.y.toFixed(2), z:+v.z.toFixed(2),
+               visible: v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 };
+    };
+    const box = playerMesh ? new THREE.Box3().setFromObject(playerMesh) : null;
+    return {
+      camPos: {x:+camera.position.x.toFixed(1), y:+camera.position.y.toFixed(1), z:+camera.position.z.toFixed(1)},
+      playerScreen: toScreen(player.pos.x, 1.6, player.pos.z),
+      playerBox: box ? {min:[+box.min.x.toFixed(2),+box.min.y.toFixed(2),+box.min.z.toFixed(2)],
+        max:[+box.max.x.toFixed(2),+box.max.y.toFixed(2),+box.max.z.toFixed(2)],
+        h:+(box.max.y-box.min.y).toFixed(2),
+        w:+(box.max.x-box.min.x).toFixed(2),
+        d:+(box.max.z-box.min.z).toFixed(2),
+        rotY:+playerMesh.rotation.y.toFixed(2),
+        scale:+playerMesh.scale.x.toFixed(3),
+        children:playerMesh.children.length} : null,
+      enemies: enemies.map(e => ({...toScreen(e.pos.x, 1.6, e.pos.z), d:+Math.hypot(e.pos.x-player.pos.x, e.pos.z-player.pos.z).toFixed(1)})),
+      playerCorners: box ? [[box.min.x,box.min.y,box.min.z],[box.max.x,box.min.y,box.min.z],
+        [box.max.x,box.max.y,box.min.z],[box.min.x,box.max.y,box.min.z],
+        [box.min.x,box.min.y,box.max.z],[box.max.x,box.min.y,box.max.z],
+        [box.max.x,box.max.y,box.max.z],[box.min.x,box.max.y,box.max.z]]
+        .map(c => toScreen(c[0], c[1], c[2])) : null,
+      orbs: orbs.slice(0,3).map(o => toScreen(o.x, 1.2, o.z)),
+      rendererSize: {w:renderer.domElement.width, h:renderer.domElement.height},
+      exposure: renderer.toneMappingExposure,
+    };
+  },
+  // test köprüsü: kareyi oku (küçük ASCII luminans haritası döner)
+  capture(w = 96, h = 54) {
+    renderer.render(scene, camera);
+    const src = renderer.domElement;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    g.drawImage(src, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data;
+    const chars = ' .:-=+*#%@';
+    const rows = [];
+    let sum = 0, maxv = 0, nonBlack = 0;
+    for (let y = 0; y < h; y++) {
+      let row = '';
+      for (let x = 0; x < w; x++) {
+        const i = (y*w + x)*4;
+        const lum = (d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114) / 255;
+        sum += lum; if (lum > maxv) maxv = lum; if (lum > 0.04) nonBlack++;
+        row += chars[Math.min(9, Math.floor(lum*9.99))];
+      }
+      rows.push(row);
+    }
+    return { rows, avg: +(sum/(w*h)).toFixed(3), max: +maxv.toFixed(3),
+             nonBlackPct: +(nonBlack/(w*h)*100).toFixed(1) };
+  },
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,2142 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>DENİZ DİBİ — Çöp Avcısı</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#02121f;
+    font-family:"Segoe UI", system-ui, -apple-system, sans-serif; color:#e8f6ff; user-select:none; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; pointer-events:none; display:none; }
+  #hud.on { display:block; }
+  .panel { position:absolute; background:rgba(4,26,42,.62); border:1px solid rgba(70,200,255,.28);
+    border-radius:14px; padding:10px 14px; backdrop-filter:blur(6px); box-shadow:0 6px 24px rgba(0,0,0,.4); }
+  .lbl { font-size:11px; letter-spacing:2px; color:#6fd8ff; text-transform:uppercase; }
+  #scorePanel { top:14px; left:14px; min-width:170px; }
+  #scoreVal { font-size:30px; font-weight:700; line-height:1.1; color:#fff;
+    text-shadow:0 0 14px rgba(70,200,255,.7); }
+  #bestVal { font-size:12px; color:#8ec4dd; margin-top:2px; }
+  #oxyPanel { top:110px; left:14px; min-width:220px; }
+  #oxyWrap { width:190px; height:14px; background:rgba(4,20,34,.8); border:1px solid rgba(70,200,255,.35);
+    border-radius:8px; overflow:hidden; margin-top:5px; }
+  #oxyBar { height:100%; width:100%; background:linear-gradient(90deg,#38e8ff,#7cffb2);
+    box-shadow:0 0 12px rgba(70,230,255,.8); transition:width .12s linear; }
+  #oxyBar.low { background:linear-gradient(90deg,#ffd166,#ff5f6d); animation:pulse .6s ease-in-out infinite alternate; }
+  @keyframes pulse { from { opacity:.65; } to { opacity:1; } }
+  #oxyVal { position:absolute; right:14px; top:12px; font-size:16px; font-weight:700; color:#bfeaff; }
+  #depthVal { font-size:12px; color:#8ec4dd; margin-top:4px; font-variant-numeric:tabular-nums; }
+  #breath { position:absolute; bottom:150px; left:50%; transform:translateX(-50%);
+    font-size:20px; font-weight:800; letter-spacing:2px; color:#7cffb2; opacity:0;
+    text-shadow:0 0 18px rgba(80,255,170,.9); transition:opacity .2s; pointer-events:none; }
+  #breath.on { opacity:1; animation:pulse .5s ease-in-out infinite alternate; }
+  #surfHint { position:absolute; top:76px; left:50%; transform:translateX(-50%);
+    font-size:16px; font-weight:700; letter-spacing:1px; color:#ffd166; opacity:0;
+    text-shadow:0 0 14px rgba(255,200,80,.85); transition:opacity .3s; pointer-events:none; }
+  #surfHint.on { opacity:1; animation:bobUp .9s ease-in-out infinite; }
+  @keyframes bobUp { 0%,100% { transform:translateX(-50%) translateY(0); }
+                     50% { transform:translateX(-50%) translateY(-8px); } }
+  #infoPanel { top:14px; right:14px; text-align:right; min-width:150px; }
+  #trashVal { font-size:24px; font-weight:800; color:#7cffb2; text-shadow:0 0 12px rgba(90,255,170,.5); }
+  #waveVal { font-size:12px; color:#6fd8ff; margin-top:3px; letter-spacing:1px; }
+  #timerVal { font-size:18px; font-weight:600; color:#ffd166; font-variant-numeric:tabular-nums; }
+  #comboVal { position:absolute; top:20px; left:50%; transform:translateX(-50%);
+    font-size:34px; font-weight:800; color:#ffd166; text-shadow:0 0 20px rgba(255,200,80,.8);
+    opacity:0; transition:opacity .2s, transform .2s; }
+  #comboVal.show { opacity:1; transform:translateX(-50%) scale(1.12); }
+  #hintBar { position:absolute; bottom:14px; right:14px; text-align:left;
+    font-size:12px; line-height:1.8; letter-spacing:.4px; color:rgba(170,225,255,.85);
+    background:rgba(4,26,42,.6); border:1px solid rgba(70,200,255,.25);
+    padding:9px 14px; border-radius:12px; backdrop-filter:blur(6px);
+    box-shadow:0 6px 20px rgba(0,0,0,.35); }
+  #hintBar b { color:#38e8ff; font-weight:700; }
+
+  /* ---------- Yetenekler (Skills) ---------- */
+  #skillBar { position:absolute; bottom:14px; left:14px; display:flex; gap:10px; }
+  .skill { position:relative; width:62px; height:62px; border-radius:14px;
+    background:rgba(4,26,42,.68); border:1px solid rgba(70,200,255,.3);
+    box-shadow:0 6px 20px rgba(0,0,0,.35); overflow:hidden;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    pointer-events:auto; cursor:pointer; transition:opacity .15s; }
+  .skill .ico { font-size:23px; line-height:1; filter:drop-shadow(0 0 6px rgba(70,200,255,.6)); }
+  .skill .kcap { position:absolute; top:3px; left:6px; font-size:10px; font-weight:800;
+    color:#38e8ff; letter-spacing:.5px; }
+  .skill .cd { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:19px; font-weight:800; color:#fff; text-shadow:0 0 8px rgba(0,0,0,.8);
+    background:rgba(2,12,22,.55); opacity:0; }
+  .skill .cdfill { position:absolute; left:0; bottom:0; width:100%; height:0%;
+    background:rgba(56,232,255,.14); pointer-events:none; }
+  .skill.cooling .cd { opacity:1; }
+  .skill.active { border-color:#7cffb2; box-shadow:0 0 16px rgba(124,255,178,.45);
+    background:rgba(10,44,36,.72); }
+  .skill.dis { filter:grayscale(.9) brightness(.65); }
+  body.touch .skill .kcap { display:none; }
+
+  /* ---------- Sonar pusulası (üst orta) ---------- */
+  #sonarCompass { position:absolute; top:118px; left:50%; transform:translateX(-50%);
+    width:66px; height:66px; border-radius:50%; pointer-events:none;
+    border:2px solid rgba(124,255,178,.6); background:rgba(4,26,42,.55);
+    box-shadow:0 0 18px rgba(124,255,178,.3); display:flex; align-items:center;
+    justify-content:center; font-size:20px; opacity:0; transition:opacity .3s; }
+  #sonarCompass .hand { position:absolute; width:2px; height:50%; bottom:50%; left:50%;
+    transform-origin:bottom center; background:linear-gradient(to top, rgba(124,255,178,.95), rgba(124,255,178,.25));
+    transform:translateX(-50%) rotate(var(--sonar-x, 0deg)); }
+  #sonarCompass .lbl { position:absolute; bottom:-20px; font-size:10px; letter-spacing:1px;
+    color:#7cffb2; white-space:nowrap; }
+  #sonarCompass.on { opacity:1; animation:pulse .8s ease-in-out infinite alternate; }
+
+  /* ---------- Düşük oksijen uyarısı ---------- */
+  #oxyWarn { position:fixed; inset:0; pointer-events:none; opacity:0; z-index:10;
+    background:radial-gradient(ellipse at 50% 50%, rgba(255,40,60,0) 45%, rgba(255,30,50,.45) 100%);
+    transition:opacity .4s; }
+  #oxyWarn.on { animation:warrn .7s ease-in-out infinite alternate; }
+  @keyframes warrn { from { opacity:.35; } to { opacity:.85; } }
+
+  /* ---------- Skor floaters ---------- */
+  .floater { position:fixed; font-size:20px; font-weight:800; color:#7cffb2;
+    text-shadow:0 0 12px rgba(80,255,170,.8), 0 2px 4px rgba(0,0,0,.6);
+    pointer-events:none; z-index:14; animation:floaterUp .85s ease-out forwards; }
+  .floater.big { font-size:26px; color:#ffd166; text-shadow:0 0 16px rgba(255,200,80,.9); }
+  @keyframes floaterUp {
+    0%   { opacity:1; transform:translate(-50%,-50%) translateY(0) scale(1); }
+    100% { opacity:0; transform:translate(-50%,-50%) translateY(-64px) scale(1.15); }
+  }
+
+  /* ---------- Overlays ---------- */
+  .overlay { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; gap:14px; padding:24px;
+    background:radial-gradient(ellipse at 50% 40%, rgba(6,42,66,.74), rgba(2,10,18,.95));
+    z-index:20; }
+  .overlay.hidden { display:none; }
+  h1 { font-size:clamp(30px,7vw,60px); font-weight:800; letter-spacing:2px;
+    background:linear-gradient(90deg,#38e8ff,#7cffb2,#ffd166);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  h2 { font-size:clamp(22px,5vw,40px); font-weight:700; color:#fff; }
+  .sub { font-size:15px; color:#a8cbe0; max-width:600px; line-height:1.6; }
+  .keys { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:4px; }
+  .key { background:rgba(8,38,58,.85); border:1px solid rgba(70,200,255,.35); border-radius:10px;
+    padding:8px 13px; font-size:13px; color:#cfeeff; }
+  .key b { color:#38e8ff; }
+  .btn { pointer-events:auto; cursor:pointer; border:none; border-radius:999px;
+    padding:15px 44px; font-size:18px; font-weight:700; letter-spacing:1px; color:#03141f;
+    background:linear-gradient(90deg,#38e8ff,#7cffb2); box-shadow:0 8px 30px rgba(60,200,255,.35);
+    transition:transform .12s ease, box-shadow .12s ease; }
+  .btn:hover { transform:translateY(-2px) scale(1.03); box-shadow:0 12px 36px rgba(60,200,255,.5); }
+  .btn:active { transform:scale(.97); }
+  #finalScore { font-size:52px; font-weight:800; color:#ffd166; text-shadow:0 0 24px rgba(255,200,80,.5); }
+  .stats { display:flex; gap:26px; flex-wrap:wrap; justify-content:center; }
+  .stat { background:rgba(6,32,50,.8); border:1px solid rgba(70,200,255,.25);
+    border-radius:12px; padding:10px 18px; min-width:120px; }
+  .stat .k { font-size:11px; letter-spacing:1.5px; color:#6fd8ff; text-transform:uppercase; }
+  .stat .v { font-size:22px; font-weight:700; margin-top:2px; }
+  .trashLegend { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:2px; }
+  .titem { background:rgba(6,32,50,.75); border:1px solid rgba(70,200,255,.22);
+    border-radius:10px; padding:6px 12px; font-size:13px; color:#cfeeff; }
+  .titem b { color:#7cffb2; }
+
+  /* ---------- Loader ---------- */
+  #loader { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:18px; background:#02121f; z-index:40; }
+  #loader.hidden { display:none; }
+  .ring { width:56px; height:56px; border-radius:50%; border:4px solid rgba(70,200,255,.18);
+    border-top-color:#38e8ff; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loadTxt { font-size:13px; letter-spacing:2px; color:#6fd8ff; }
+  #loadBar { width:240px; height:6px; background:rgba(70,200,255,.15); border-radius:4px; overflow:hidden; }
+  #loadFill { height:100%; width:0%; background:linear-gradient(90deg,#38e8ff,#7cffb2); transition:width .2s; }
+
+  /* ---------- Toast ---------- */
+  #toast { position:fixed; top:26%; left:50%; transform:translateX(-50%); font-size:26px;
+    font-weight:800; letter-spacing:1px; color:#7cffb2; text-shadow:0 0 18px rgba(80,255,170,.7);
+    opacity:0; pointer-events:none; z-index:15; transition:opacity .25s, transform .25s; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(-10px); }
+
+  /* ---------- Mobile ---------- */
+  #stick { position:fixed; width:120px; height:120px; border-radius:50%; display:none;
+    border:2px solid rgba(70,200,255,.5); background:rgba(10,50,80,.35); z-index:12; pointer-events:none; }
+  #stickKnob { position:absolute; left:50%; top:50%; width:52px; height:52px; margin:-26px 0 0 -26px;
+    border-radius:50%; background:rgba(56,232,255,.75); box-shadow:0 0 16px rgba(56,232,255,.7); }
+  .vbtn { position:fixed; right:26px; width:74px; height:74px; border-radius:50%; display:none;
+    align-items:center; justify-content:center; font-size:24px; font-weight:800; color:#03141f;
+    background:linear-gradient(135deg,#38e8ff,#7cffb2); box-shadow:0 6px 20px rgba(60,200,255,.4);
+    z-index:13; border:none; }
+  #upBtn { bottom:126px; }
+  #downBtn { bottom:38px; }
+  body.touch .vbtn { display:flex; }
+  body.touch #hintBar { display:none; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud">
+  <div class="panel" id="scorePanel">
+    <div class="lbl">Skor</div>
+    <div id="scoreVal">0</div>
+    <div id="bestVal">Rekor: 0</div>
+  </div>
+  <div class="panel" id="oxyPanel">
+    <div class="lbl">Oksijen</div>
+    <div id="oxyWrap"><div id="oxyBar"></div></div>
+    <div id="depthVal">Derinlik: 15 m</div>
+    <div id="oxyVal">100%</div>
+  </div>
+  <div class="panel" id="infoPanel">
+    <div id="trashVal">♻ 0</div>
+    <div id="waveVal">DALGA 1</div>
+    <div id="timerVal">00:00</div>
+  </div>
+  <div id="comboVal"></div>
+  <div id="sonarCompass"><span class="hand"></span><span class="lbl">ÇÖP 🧭</span></div>
+  <div id="surfHint">↑ YÜZEYE ÇIK — NEFES AL</div>
+  <div id="breath">NEFES ALIYORSUN ↑</div>
+  <div id="hintBar">
+    <b>AMAC</b> — çöp topla, yüzeyde nefes al, denizanalarından kaçın<br>
+    <b>WASD</b> / Ok — yüz<br>
+    <b>Space</b> — yüksel · yüzeyde nefeslen<br>
+    <b>Shift</b> — alçal · dip ve dipte <b>yürü</b><br>
+    <b>P</b> — duraklat · <b>R</b> — yeniden · <b>M</b> — ses<br>
+    <b>1</b> Turbo · <b>2</b> O₂ Şoku · <b>3</b> Mıknatıs · <b>4</b> Sonar
+  </div>
+  <div id="skillBar">
+    <div class="skill" id="sk_dash"><span class="kcap">1</span><span class="ico">⚡</span><span class="cd"></span><span class="cdfill"></span></div>
+    <div class="skill" id="sk_shock"><span class="kcap">2</span><span class="ico">🫧</span><span class="cd"></span><span class="cdfill"></span></div>
+    <div class="skill" id="sk_magnet"><span class="kcap">3</span><span class="ico">🧲</span><span class="cd"></span><span class="cdfill"></span></div>
+    <div class="skill" id="sk_sonar"><span class="kcap">4</span><span class="ico">📡</span><span class="cd"></span><span class="cdfill"></span></div>
+  </div>
+</div>
+
+<div id="oxyWarn"></div>
+<div id="floaters"></div>
+<div id="toast"></div>
+<div id="stick"><div id="stickKnob"></div></div>
+<button class="vbtn" id="upBtn">▲</button>
+<button class="vbtn" id="downBtn">▼</button>
+
+<div id="loader">
+  <div class="ring"></div>
+  <div id="loadTxt">DALIYORUM (0/1)</div>
+  <div id="loadBar"><div id="loadFill"></div></div>
+</div>
+
+<div class="overlay" id="menu">
+  <h1>DENİZ DİBİ — ÇÖP AVCISI</h1>
+  <p class="sub">
+    Denize atılan plastikler her şeyi kirletiyor! Dibe in, şişeleri, kutuları, poşetleri ve
+    lastikleri topla — <b>her topladığın çöp sana oksijen kazandırır</b>. Nefesin azalırsa
+    <b>yüzeye çıkıp derin bir nefes al</b> (dip ile yüzey arası gidiş-dönüş ~6 sn).
+    Denizanasına dokunma, oksijenin biterse boğulursun! Seri yaptıkça çöpün puanı katlanır.
+  </p>
+  <div class="keys">
+    <div class="key"><b>W A S D</b> / Ok — Yüz</div>
+    <div class="key"><b>Space</b> — Yüksel · yüzeyde nefeslen</div>
+    <div class="key"><b>Shift</b> — Alçal</div>
+    <div class="key"><b>Dip</b> — zemine in ve yürü</div>
+    <div class="key"><b>1</b> Turbo · <b>2</b> O₂ Şoku · <b>3</b> Mıknatıs · <b>4</b> Sonar</div>
+    <div class="key"><b>P</b> — Duraklat</div>
+    <div class="key"><b>R</b> — Yeniden başla</div>
+    <div class="key"><b>M</b> — Ses aç / kapa</div>
+  </div>
+  <div class="trashLegend">
+    <div class="titem">🥤 Şişe <b>+10</b> · +6 O₂</div>
+    <div class="titem">🥫 Kutu <b>+15</b> · +8 O₂</div>
+    <div class="titem">🛍 Poşet <b>+25</b> · +10 O₂</div>
+    <div class="titem">🫧 Yüzey — bedava nefes</div>
+    <div class="titem">🛞 Lastik <b>+40</b> · +14 O₂</div>
+  </div>
+  <button class="btn" id="startBtn">DAL!</button>
+</div>
+
+<div class="overlay hidden" id="pause">
+  <h2>DURAKLADI</h2>
+  <p class="sub">Devam etmek için <b>P</b> tuşuna bas.</p>
+  <button class="btn" id="resumeBtn">DEVAM ET</button>
+</div>
+
+<div class="overlay hidden" id="gameover">
+  <h2>NEFESİN BİTTİ!</h2>
+  <div id="finalScore">0</div>
+  <div class="stats">
+    <div class="stat"><div class="k">Toplanan</div><div class="v" id="goTrash">0</div></div>
+    <div class="stat"><div class="k">Süre</div><div class="v" id="goTime">00:00</div></div>
+    <div class="stat"><div class="k">Dalga</div><div class="v" id="goWave">1</div></div>
+    <div class="stat"><div class="k">Rekor</div><div class="v" id="goBest">0</div></div>
+  </div>
+  <button class="btn" id="againBtn">TEKRAR DAL</button>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from './lib/three/examples/jsm/loaders/GLTFLoader.js';
+
+/* =========================================================
+   AYARLAR
+   ========================================================= */
+const CFG = {
+  arenaR: 40,
+  yMin: 0,           // dip: ayaklar tabana değer
+  yMax: 21,          // su yüzeyi 22'de
+  breathY: 20,       // bu yükseklikte nefes alınır
+  breathRate: 42,    // sn'de dolum
+  jMaxY: 15.5,       // denizanaları yüzeye yaklaşmasın
+  trashMaxY: 16.5,   // çöpler suya en yakın konum
+  hSpeed: 9.5,
+  vSpeed: 6.5,
+  oxyStart: 100,
+  oxyDrain: 1.15,
+  oxyDrainPerWave: 0.12,
+  waveTime: 25,
+  stingDmg: 18,
+  invuln: 1.5,
+  pickR: 1.9,
+  charH: 3.2,
+  startTrash: 12,
+  playerR: 0.95,
+
+  // yetenekler (skiller)
+  dashSpeed: 26,      // turbo itiş hızı
+  dashTime: 0.42,     // turbo süresi (sn)
+  dashCd: 5,          // turbo bekleme (sn)
+  shockOxy: 30,       // O₂ şoku kazancı
+  shockCd: 18,
+  magnetR: 16,        // mıknatıs yarıçapı
+  magnetPull: 11,     // çekim ivmesi
+  magnetTime: 7,
+  magnetCd: 16,
+  sonarCd: 12,
+  sonarTime: 7,
+};
+
+// birincil işaretçi fare/trackpad ise masaüstü arayüzü (dokunmatik ekranlı laptop dahil)
+const IS_TOUCH = !matchMedia('(pointer: fine)').matches &&
+  (('ontouchstart' in window) || navigator.maxTouchPoints > 0 || matchMedia('(pointer: coarse)').matches);
+if (IS_TOUCH) document.body.classList.add('touch');
+
+const $ = (id) => document.getElementById(id);
+const ui = {
+  hud:$('hud'), score:$('scoreVal'), best:$('bestVal'), oxyBar:$('oxyBar'), oxyVal:$('oxyVal'),
+  trash:$('trashVal'), wave:$('waveVal'), timer:$('timerVal'), combo:$('comboVal'),
+  menu:$('menu'), pause:$('pause'), over:$('gameover'), loader:$('loader'),
+  loadFill:$('loadFill'), loadTxt:$('loadTxt'), toast:$('toast'), oxyWarn:$('oxyWarn'),
+  finalScore:$('finalScore'), goTrash:$('goTrash'), goTime:$('goTime'),
+  goWave:$('goWave'), goBest:$('goBest'), floaters:$('floaters'),
+  breath:$('breath'), surfHint:$('surfHint'), depth:$('depthVal'),
+  sonarCompass:$('sonarCompass'),
+};
+const skillEls = {
+  dash:  { root:$('sk_dash'),  cd:document.querySelector('#sk_dash .cd'),  fill:document.querySelector('#sk_dash .cdfill') },
+  shock: { root:$('sk_shock'), cd:document.querySelector('#sk_shock .cd'), fill:document.querySelector('#sk_shock .cdfill') },
+  magnet:{ root:$('sk_magnet'),cd:document.querySelector('#sk_magnet .cd'),fill:document.querySelector('#sk_magnet .cdfill') },
+  sonar: { root:$('sk_sonar'), cd:document.querySelector('#sk_sonar .cd'), fill:document.querySelector('#sk_sonar .cdfill') },
+};
+// mobilde de kullanılsın: kareye dokunarak tetikle (click yedeği dedupe'lu)
+for (const id in skillEls) {
+  const el = skillEls[id].root;
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el._used = performance.now(); tryUse(id); });
+  el.addEventListener('click', () => {
+    if (performance.now() - (el._used || 0) < 600) return;
+    tryUse(id);
+  });
+}
+
+/* =========================================================
+   SAHNE
+   ========================================================= */
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+$('app').appendChild(renderer.domElement);
+
+const DEEP = 0x052c47;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(DEEP);
+scene.fog = new THREE.Fog(DEEP, 14, 92);
+
+const camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 400);
+const CAM_OFFSET = new THREE.Vector3(0, 5.5, 13);
+camera.position.copy(CAM_OFFSET);
+camera.lookAt(0, 6, 0);
+
+scene.add(new THREE.HemisphereLight(0x7fd4ff, 0x06283e, 1.0));
+const sun = new THREE.DirectionalLight(0xd8f4ff, 1.5);
+sun.position.set(18, 60, 14);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 140;
+sun.shadow.camera.left = -50; sun.shadow.camera.right = 50;
+sun.shadow.camera.top = 50; sun.shadow.camera.bottom = -50;
+sun.shadow.bias = -0.0008;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x2f9fd8, 0.5);
+fill.position.set(-24, 16, -20);
+scene.add(fill);
+
+/* =========================================================
+   DENİZ DİBİ / ORTAM
+   ========================================================= */
+function sandTexture() {
+  const s = 512, c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d');
+  g.fillStyle = '#c9b78a'; g.fillRect(0,0,s,s);
+  // kum dokusu: rastgele lekeler
+  for (let i=0;i<2600;i++){
+    const x = Math.random()*s, y = Math.random()*s, r = 1 + Math.random()*4;
+    g.fillStyle = Math.random() < .5 ? 'rgba(160,142,100,.35)' : 'rgba(226,214,178,.35)';
+    g.beginPath(); g.arc(x,y,r,0,7); g.fill();
+  }
+  // koyu çukur lekeleri
+  for (let i=0;i<24;i++){
+    const x = Math.random()*s, y = Math.random()*s, r = 14 + Math.random()*40;
+    const gr = g.createRadialGradient(x,y,0,x,y,r);
+    gr.addColorStop(0,'rgba(90,80,55,.45)'); gr.addColorStop(1,'rgba(90,80,55,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(x,y,r,0,7); g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(12,12);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
+const seabed = new THREE.Mesh(
+  new THREE.CircleGeometry(CFG.arenaR + 6, 96),
+  new THREE.MeshStandardMaterial({ map: sandTexture(), roughness:.95, metalness:.02 })
+);
+seabed.rotation.x = -Math.PI/2;
+seabed.receiveShadow = true;
+scene.add(seabed);
+
+const deepPlane = new THREE.Mesh(
+  new THREE.CircleGeometry(240, 64),
+  new THREE.MeshBasicMaterial({ color:0x021824 })
+);
+deepPlane.rotation.x = -Math.PI/2; deepPlane.position.y = -0.2;
+scene.add(deepPlane);
+
+// sınır halkası (dibi)
+const edgeRing = new THREE.Mesh(
+  new THREE.TorusGeometry(CFG.arenaR, 0.3, 10, 140),
+  new THREE.MeshStandardMaterial({ color:0x0a2c44, emissive:0x1f9fd8,
+    emissiveIntensity:1.4, roughness:.5, metalness:.3 })
+);
+edgeRing.rotation.x = -Math.PI/2; edgeRing.position.y = 0.3;
+scene.add(edgeRing);
+
+// sınır duvarı (soluk silindir)
+const wall = new THREE.Mesh(
+  new THREE.CylinderGeometry(CFG.arenaR, CFG.arenaR, 22, 64, 1, true),
+  new THREE.MeshBasicMaterial({ color:0x2fb8ff, transparent:true, opacity:0.07,
+    side:THREE.DoubleSide, depthWrite:false })
+);
+wall.position.y = 11;
+scene.add(wall);
+
+// su yüzeyi (aşağıdan görünüm)
+const surface = new THREE.Mesh(
+  new THREE.CircleGeometry(90, 72),
+  new THREE.MeshBasicMaterial({ color:0x49bfe8, transparent:true, opacity:0.5,
+    side:THREE.DoubleSide, depthWrite:false })
+);
+surface.rotation.x = -Math.PI/2; surface.position.y = 22;
+scene.add(surface);
+
+// ışık huzmeleri
+const shafts = [];
+{
+  const geo = new THREE.CylinderGeometry(1.6, 5.5, 22, 10, 1, true);
+  for (let i=0;i<7;i++){
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color:0x9fe8ff, transparent:true, opacity:0.05,
+      blending:THREE.AdditiveBlending, side:THREE.DoubleSide, depthWrite:false }));
+    const a = Math.random()*Math.PI*2, r = Math.random()*(CFG.arenaR-8);
+    m.position.set(Math.cos(a)*r, 11, Math.sin(a)*r);
+    m.rotation.z = (Math.random()-0.5)*0.22;
+    m.rotation.x = (Math.random()-0.5)*0.22;
+    m.userData.ph = Math.random()*6.28;
+    scene.add(m); shafts.push(m);
+  }
+}
+
+// kayalar (engel)
+const obstacles = [];
+{
+  const mat = new THREE.MeshStandardMaterial({ color:0x5d6a72, roughness:.9, metalness:.05, flatShading:true });
+  const mat2 = new THREE.MeshStandardMaterial({ color:0x6b6257, roughness:.95, metalness:.03, flatShading:true });
+  for (let i=0;i<26;i++){
+    const a = Math.random()*Math.PI*2, r = 4 + Math.random()*(CFG.arenaR-6);
+    const x = Math.cos(a)*r, z = Math.sin(a)*r;
+    const sc = 0.7 + Math.random()*2.1;
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(sc, 0), Math.random()<.5 ? mat : mat2);
+    rock.position.set(x, sc*0.45, z);
+    rock.rotation.set(Math.random()*3, Math.random()*3, Math.random()*3);
+    rock.castShadow = true; rock.receiveShadow = true;
+    scene.add(rock);
+    if (sc > 1.2) obstacles.push({ x, z, r: sc*0.95 });
+  }
+}
+
+// mercanlar
+{
+  const colors = [0xff6a8a, 0xffb347, 0xc77dff, 0x3ecf9a, 0xff7b54];
+  for (let i=0;i<14;i++){
+    const a = Math.random()*Math.PI*2, r = 5 + Math.random()*(CFG.arenaR-7);
+    const x = Math.cos(a)*r, z = Math.sin(a)*r;
+    const col = colors[i % colors.length];
+    const m = new THREE.MeshStandardMaterial({ color:col, emissive:col,
+      emissiveIntensity:.35, roughness:.6 });
+    const g = new THREE.Group();
+    const n = 3 + (i % 3);
+    for (let k=0;k<n;k++){
+      const s = 0.28 + Math.random()*0.4;
+      const b = new THREE.Mesh(new THREE.SphereGeometry(s, 8, 6), m);
+      b.position.set((Math.random()-0.5)*1.2, s + Math.random()*0.8, (Math.random()-0.5)*1.2);
+      b.castShadow = true;
+      g.add(b);
+    }
+    g.position.set(x, 0, z);
+    scene.add(g);
+  }
+}
+
+// deniz otları (sallanan)
+const weeds = [];
+{
+  const geo = new THREE.PlaneGeometry(0.4, 3, 1, 4);
+  geo.translate(0, 1.5, 0);   // tabandan uzasın
+  for (let i=0;i<46;i++){
+    const a = Math.random()*Math.PI*2, r = 3 + Math.random()*(CFG.arenaR-4);
+    const h = 0.7 + Math.random()*1.4;
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color:0x1f8f5a, emissive:0x0c4a2c, emissiveIntensity:.4,
+      roughness:.8, side:THREE.DoubleSide, transparent:true, opacity:.95 }));
+    m.position.set(Math.cos(a)*r, 0, Math.sin(a)*r);
+    m.scale.set(1, h, 1);
+    m.rotation.y = Math.random()*Math.PI;
+    m.userData.ph = Math.random()*6.28;
+    scene.add(m); weeds.push(m);
+  }
+}
+
+// kabarcıklar (yüzeyde yükselen)
+const BUB = 340;
+const bubGeo = new THREE.BufferGeometry();
+const bubPos = new Float32Array(BUB*3);
+const bubSpd = new Float32Array(BUB);
+for (let i=0;i<BUB;i++){
+  const a = Math.random()*Math.PI*2, r = Math.random()*CFG.arenaR;
+  bubPos[i*3] = Math.cos(a)*r;
+  bubPos[i*3+1] = Math.random()*22;
+  bubPos[i*3+2] = Math.sin(a)*r;
+  bubSpd[i] = 0.7 + Math.random()*1.6;
+}
+bubGeo.setAttribute('position', new THREE.BufferAttribute(bubPos, 3));
+const bubbles = new THREE.Points(bubGeo, new THREE.PointsMaterial({
+  color:0xd6f6ff, size:0.17, transparent:true, opacity:.7, sizeAttenuation:true, depthWrite:false }));
+scene.add(bubbles);
+
+// balıklar
+const fishes = [];
+{
+  const bodyGeo = new THREE.ConeGeometry(0.17, 0.6, 6);
+  bodyGeo.rotateX(Math.PI/2);            // apeks +z
+  const tailGeo = new THREE.ConeGeometry(0.14, 0.3, 5);
+  tailGeo.rotateX(-Math.PI/2);           // apeks -z
+  const cols = [0xffd166, 0x71c7ff, 0xff8f6a, 0x9fe8ff, 0xff6ad5];
+  for (let i=0;i<18;i++){
+    const col = cols[i % cols.length];
+    const mat = new THREE.MeshStandardMaterial({ color:col, emissive:col,
+      emissiveIntensity:.35, roughness:.5, flatShading:true });
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(bodyGeo, mat);
+    const tail = new THREE.Mesh(tailGeo, mat);
+    tail.position.z = -0.4;
+    g.add(body, tail);
+    const cx = (Math.random()-0.5)*44, cz = (Math.random()-0.5)*44;
+    const R = 4 + Math.random()*12;
+    const w = (0.25 + Math.random()*0.5) * (Math.random()<.5?-1:1);
+    const y = 2.5 + Math.random()*12;
+    const ph = Math.random()*6.28;
+    const scl = 0.7 + Math.random()*1.1;
+    g.scale.setScalar(scl);
+    scene.add(g);
+    fishes.push({ g, cx, cz, R, w, y, ph, a: Math.random()*6.28, tail });
+  }
+}
+
+/* =========================================================
+   DENİZANALARI
+   ========================================================= */
+function makeJelly() {
+  const g = new THREE.Group();
+  const hue = Math.random() < .5 ? 0xff6ad5 : 0xff8f6a;
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(0.72, 16, 10, 0, Math.PI*2, 0, Math.PI/2),
+    new THREE.MeshStandardMaterial({ color:hue, emissive:hue, emissiveIntensity:.7,
+      transparent:true, opacity:.72, roughness:.3, side:THREE.DoubleSide })
+  );
+  g.add(dome);
+  const tMat = new THREE.MeshStandardMaterial({ color:hue, emissive:hue,
+    emissiveIntensity:.5, transparent:true, opacity:.55, roughness:.4 });
+  const tentacles = [];
+  for (let i=0;i<7;i++){
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.012, 1.9, 5), tMat);
+    const a = i/7 * Math.PI*2;
+    t.position.set(Math.cos(a)*0.42, -0.95, Math.sin(a)*0.42);
+    t.userData.ph = Math.random()*6.28;
+    g.add(t); tentacles.push(t);
+  }
+  g.userData.dome = dome;
+  g.userData.tentacles = tentacles;
+  return g;
+}
+
+let jellies = [];
+function spawnJelly() {
+  const mesh = makeJelly();
+  const a = Math.random()*Math.PI*2, r = 10 + Math.random()*(CFG.arenaR-13);
+  const p = new THREE.Vector3(Math.cos(a)*r, 3 + Math.random()*11, Math.sin(a)*r);
+  mesh.position.copy(p);
+  scene.add(mesh);
+  jellies.push({
+    mesh, pos: p,
+    dir: Math.random()*Math.PI*2,
+    turn: (Math.random()-0.5)*0.8,
+    speed: 1.1,
+    ph: Math.random()*6.28,
+    t: 0,
+  });
+}
+
+/* =========================================================
+   ÇÖPLER
+   ========================================================= */
+const TRASH_TYPES = [
+  { id:'bottle', label:'Şişe',  score:10, oxy:6,  w:.40, make: makeBottle },
+  { id:'can',    label:'Kutu',  score:15, oxy:8,  w:.30, make: makeCan },
+  { id:'bag',    label:'Poşet', score:25, oxy:10, w:.20, make: makeBag },
+  { id:'tire',   label:'Lastik',score:40, oxy:14, w:.10, make: makeTire },
+];
+
+function makeBottle() {
+  const g = new THREE.Group();
+  const glass = new THREE.MeshPhysicalMaterial({ color:0x59d8c0, transparent:true, opacity:.75,
+    roughness:.15, metalness:.05, emissive:0x0f4a44, emissiveIntensity:.5 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.6, 10), glass);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.2, 8), glass);
+  neck.position.y = 0.38;
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.08, 8),
+    new THREE.MeshStandardMaterial({ color:0xff5f6d, roughness:.5 }));
+  cap.position.y = 0.5;
+  g.add(body, neck, cap);
+  return g;
+}
+function makeCan() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.44, 12),
+    new THREE.MeshStandardMaterial({ color:0xcfd9e2, roughness:.25, metalness:.9 }));
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.152, 0.152, 0.2, 12),
+    new THREE.MeshStandardMaterial({ color:0xff8f3c, roughness:.4, metalness:.6,
+      emissive:0x8a3c00, emissiveIntensity:.4 }));
+  g.add(body, band);
+  return g;
+}
+function makeBag() {
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.36, 0),
+    new THREE.MeshStandardMaterial({ color:0xf2f7ff, transparent:true, opacity:.8,
+      roughness:.7, flatShading:true, emissive:0x445566, emissiveIntensity:.35 }));
+  m.scale.set(1.15, 0.75, 0.95);
+  m.rotation.set(Math.random()*3, Math.random()*3, Math.random()*3);
+  g.add(m);
+  return g;
+}
+function makeTire() {
+  const g = new THREE.Group();
+  const t = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.14, 8, 18),
+    new THREE.MeshStandardMaterial({ color:0x171a1e, roughness:.85, metalness:.1 }));
+  g.add(t);
+  return g;
+}
+
+let trash = [];
+let bursts = [];
+
+// toplanınca patlayan halka + kabarcık parçacıkları
+function spawnBurst(pos, color) {
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.62, 24),
+    new THREE.MeshBasicMaterial({ color, transparent:true, opacity:.9,
+      blending:THREE.AdditiveBlending, side:THREE.DoubleSide, depthWrite:false }));
+  g.add(ring);
+  const bits = [];
+  for (let i=0;i<7;i++){
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 5),
+      new THREE.MeshBasicMaterial({ color, transparent:true, opacity:.95, depthWrite:false }));
+    b.userData.v = new THREE.Vector3((Math.random()-0.5)*4.5, Math.random()*3.2+1.2, (Math.random()-0.5)*4.5);
+    g.add(b); bits.push(b);
+  }
+  g.position.copy(pos);
+  scene.add(g);
+  bursts.push({ g, ring, bits, t: 0, life: 0.6 });
+}
+
+// turbo izi: arkada ufak parlak kabarcıklar
+let trailArr = [];
+function spawnSkillTrail() {
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.13 + Math.random()*0.1, 6, 5),
+    new THREE.MeshBasicMaterial({ color:0x7cd7ff, transparent:true, opacity:.8,
+      blending:THREE.AdditiveBlending, depthWrite:false }));
+  b.position.set(
+    player.pos.x + (Math.random()-0.5)*1.2,
+    player.pos.y + 1.2 + (Math.random()-0.5)*1.2,
+    player.pos.z + (Math.random()-0.5)*1.2);
+  b.userData.t = 0;
+  scene.add(b); trailArr.push(b);
+}
+function updateTrail(dt) {
+  for (let i=trailArr.length-1; i>=0; i--) {
+    const b = trailArr[i];
+    b.userData.t += dt;
+    const p = b.userData.t / 0.5;
+    if (p >= 1) { scene.remove(b); trailArr.splice(i,1); continue; }
+    b.position.y += dt*1.5;
+    b.material.opacity = 0.8*(1-p);
+    b.scale.setScalar(Math.max(0.15, 1-p));
+  }
+}
+
+function pickType() {
+  let r = Math.random(), acc = 0;
+  for (const t of TRASH_TYPES) { acc += t.w; if (r <= acc) return t; }
+  return TRASH_TYPES[0];
+}
+
+function spawnTrash() {
+  const type = pickType();
+  const mesh = type.make();
+  let x=0, z=0, y=0, tries=0;
+  do {
+    const a = Math.random()*Math.PI*2, r = 3 + Math.random()*(CFG.arenaR-5);
+    x = Math.cos(a)*r; z = Math.sin(a)*r;
+    y = CFG.yMin + 0.8 + Math.random()*(CFG.trashMaxY - CFG.yMin - 0.8);
+    tries++;
+  } while (tries < 30 && (Math.hypot(x, z) < 6 ||
+           obstacles.some(o => Math.hypot(x-o.x, z-o.z) < o.r + 1.6)));
+  mesh.position.set(x, y, z);
+  scene.add(mesh);
+  trash.push({ mesh, type, x, y, z, t: Math.random()*6.28,
+    spin: (Math.random()-0.5)*1.6 });
+}
+
+/* =========================================================
+   MODEL YÜKLEME + DÜĞÜM
+   ========================================================= */
+const loader = new GLTFLoader();
+let playerRoot = null;   // position + yaw
+let tiltG = null;        // yatay pozisyon eğimi
+let playerActor = null;
+const clock = new THREE.Clock();
+const SEG_HIPS_Y = 0.140;
+const BONE_NAMES = ['Hips','Spine','Head','LeftUpLeg','LeftLeg','LeftFoot',
+                    'RightUpLeg','RightLeg','RightFoot'];
+
+async function boot() {
+  ui.loadTxt.textContent = 'DALIYORUM (0/1)';
+  let gltf = null, bilfen = true;
+  try {
+    gltf = await new Promise((res, rej) =>
+      loader.load('./Bilfen_Robot.glb', res, (e)=>{
+        if (e.total) ui.loadFill.style.width = (e.loaded/e.total*100) + '%';
+      }, rej));
+  } catch(e) {
+    bilfen = false;   // robot yüklenemezse eski modele düş
+    gltf = await new Promise((res, rej) =>
+      loader.load('./model-hq.glb', res, (e)=>{
+        if (e.total) ui.loadFill.style.width = (e.loaded/e.total*100) + '%';
+      }, rej));
+  }
+  ui.loadFill.style.width = '100%';
+
+  const root = gltf.scene;
+  root.traverse(o => {
+    if (o.isMesh) {
+      o.castShadow = true;
+      o.receiveShadow = true;
+      if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+      o.geometry.computeBoundingBox();
+      if (!bilfen) o.material = new THREE.MeshStandardMaterial({ color:0x35e0ff, roughness:.5, metalness:.25,
+        emissive:0x0a4a5e, emissiveIntensity:.35 });
+    }
+  });
+  const bb = new THREE.Box3().setFromObject(root);
+  const h = bb.max.y - bb.min.y;
+  const scale = CFG.charH / h;
+  const wrap = new THREE.Group();
+  root.position.y = -bb.min.y;
+  wrap.add(root);
+  wrap.scale.setScalar(scale);
+
+  tiltG = new THREE.Group();
+  tiltG.add(wrap);
+  playerRoot = new THREE.Group();
+  playerRoot.add(tiltG);
+  playerRoot.position.set(0, 7, 0);
+  scene.add(playerRoot);
+
+  if (bilfen) {
+    // hazır animasyonlar: Idle / Walk / Wave
+    const mixer = new THREE.AnimationMixer(root);
+    const actions = {};
+    for (const clip of gltf.animations) actions[clip.name.toLowerCase()] = mixer.clipAction(clip);
+    playerActor = { mixer, actions, current: null, bones: null, phase: 0, sm: 0 };
+  } else {
+    // kemikleri topla
+    const bones = {};
+    playerRoot.traverse(o => { if (BONE_NAMES.includes(o.name)) bones[o.name] = o; });
+    const ok = BONE_NAMES.every(n => bones[n]);
+    playerActor = { bones: ok ? bones : null, phase: Math.PI, sm: 0 };
+  }
+
+  ui.loadTxt.textContent = 'HAZIR';
+  setTimeout(()=> ui.loader.classList.add('hidden'), 250);
+  animate();
+}
+
+/* =========================================================
+   BILFEN ROBOT — mixer animasyon yönetimi
+   ========================================================= */
+function mixPlay(a, name, ts = 1, fade = 0.2) {
+  const act = a.actions[name];
+  if (!act) return;
+  act.timeScale = ts;
+  if (a.current !== name) {
+    act.reset().fadeIn(fade).play();
+    if (a.current && a.actions[a.current]) a.actions[a.current].fadeOut(fade);
+    a.current = name;
+    if (name === 'walk') a.lastStepK = 0;
+  }
+}
+
+// dipte: hareket varsa Walk (hıza göre tempo), yoksa Idle
+function robotFloorAnim(a, dt, hv) {
+  if (!a || !a.mixer) return;
+  const speed = hv * CFG.hSpeed;
+  if (speed > 0.4) {
+    mixPlay(a, 'walk', Math.max(0.55, Math.min(2.2, speed/2.4)));
+    // adım sesleri: döngünün her yarısında bir topuk
+    const w = a.actions.walk;
+    const half = w.getClip().duration / 2;
+    const k = Math.floor(w.time / half);
+    if (a.lastStepK !== undefined && k === a.lastStepK + 1) Audio.step();
+    a.lastStepK = k;
+  } else {
+    mixPlay(a, 'idle', 1);
+    a.lastStepK = undefined;
+  }
+  a.mixer.update(dt);
+}
+
+// suda: yüzeyde Wave, hareketliyken hızlı Walk (ayak vuruşu), durgunken sakin Idle
+function robotSwimAnim(a, dt, hv, atSurf) {
+  if (!a || !a.mixer) return;
+  if (atSurf) mixPlay(a, 'wave', 1, 0.3);
+  else {
+    const still = hv < 0.06;
+    mixPlay(a, still ? 'idle' : 'walk', still ? 0.6 : 0.5 + hv*1.1, 0.3);
+  }
+  a.mixer.update(dt);
+}
+
+// menü / duraklat: hafif Idle (yüzeydeyse Wave)
+function robotMenuAnim(a, dt, onFloor, atSurf) {
+  if (!a || !a.mixer) return;
+  if (atSurf) mixPlay(a, 'wave', 1, 0.3);
+  else mixPlay(a, 'idle', onFloor ? 1 : 0.6, 0.3);
+  a.mixer.update(dt);
+}
+
+/* =========================================================
+   PROSEDÜREL ANİMASYON — YÜZME
+   ========================================================= */
+// speed01: 0..1 yatay hız, vy01: -1..1 dikey hız, t: idle zaman
+function animateSwim(a, dt, speed01, vy01, t) {
+  if (!a.bones) return;
+  const b = a.bones;
+  const hv = Math.max(0, Math.min(1, speed01));
+
+  // ayak vuruşu (flutter kick)
+  a.phase += dt * (1.4 + 5.0 * hv) * Math.PI;
+  const f = a.phase;
+  const sinf = Math.sin(f), cosf = Math.cos(f);
+  const gait = Math.min(1, hv / 0.12);   // çok düşük hızda vuruş zayıflar
+  const amp = (0.08 + 0.34 * hv);
+
+  // uyluklar karşılıklı salınım
+  b.LeftUpLeg.rotation.x  = -amp * sinf;
+  b.RightUpLeg.rotation.x =  amp * sinf;
+
+  // diz: tek taraflı bükülme, itiş anında açılır
+  const kneeA = 0.14 + 0.42 * hv;
+  b.LeftLeg.rotation.x  = 0.10 + kneeA * Math.max(0, sinf) * gait;
+  b.RightLeg.rotation.x = 0.10 + kneeA * Math.max(0, -sinf) * gait;
+
+  // parmaklar hep aşağıda (yüzme)
+  const pt = 0.30 * (0.3 + 0.7 * hv);
+  b.LeftFoot.rotation.x  = pt + 0.10 * cosf * gait;
+  b.RightFoot.rotation.x = pt - 0.10 * cosf * gait;
+
+  // gövde
+  b.Hips.rotation.x = 0;
+  b.Hips.rotation.y = -0.05 * sinf * hv;
+  b.Hips.rotation.z = 0.03 * sinf * gait;
+  b.Hips.position.y = SEG_HIPS_Y + 0.012 * Math.sin(2*f) * hv + 0.008 * Math.sin(t*1.5);
+
+  // omurga: hafif dalgalanma + nefes
+  b.Spine.rotation.x = 0.06 * Math.sin(2*f + 1.2) * hv + 0.05 * Math.sin(t*1.2) * (1-hv);
+  b.Spine.rotation.y = 0.09 * sinf * hv;
+  b.Spine.rotation.z = -0.04 * sinf * gait;
+
+  // baş: gövde eğimini dengeler (vücut yatayken ileri bak), idle'da etrafa bakınma
+  b.Head.rotation.x = -lastTilt * 0.55 + 0.05 * Math.sin(t*1.1) * (1-hv);
+  b.Head.rotation.y = -b.Spine.rotation.y * 0.6 + 0.16 * Math.sin(t*0.5) * (1-hv);
+  b.Head.rotation.z = -b.Spine.rotation.z * 0.8;
+}
+let lastTilt = 0;
+
+/* =========================================================
+   PROSEDÜREL ANİMASYON — DİPTE YÜRÜYÜŞ
+   ========================================================= */
+function animateWalk(a, dt, hv, t) {
+  if (!a.bones) return;
+  const b = a.bones;
+  const speed = hv * CFG.hSpeed;
+  a.sm += (speed - a.sm) * Math.min(1, dt*8);
+  a.phase += dt * (a.sm / 1.9) * Math.PI;       // 1 adım ~ 1.9 birim
+  const run = Math.min(1, a.sm / CFG.hSpeed);
+  const gait = Math.min(1, a.sm / 3.5);
+  const f = a.phase;
+  const sinf = Math.sin(f), cosf = Math.cos(f);
+
+  // kum üstünde adım sesi (topuk değme anında)
+  if (gait > 0.25) {
+    const sgn = sinf >= 0;
+    if (a.lastSgn !== undefined && a.lastSgn !== sgn) Audio.step();
+    a.lastSgn = sgn;
+  } else a.lastSgn = undefined;
+
+  const swing = 0.16 + 0.50*run;
+  const kneeA = 0.55 + 0.85*run;
+  const footA = 0.18 + 0.30*run;
+  const lean  = 0.06 + 0.34*run;
+  const bobA  = (0.010 + 0.045*run) * gait;
+
+  b.LeftUpLeg.rotation.x  = -swing * sinf;
+  b.RightUpLeg.rotation.x =  swing * sinf;
+
+  const kneeBase = 0.07 * (1 - gait*0.5);
+  b.LeftLeg.rotation.x  = kneeBase + kneeA * Math.max(0, sinf)
+                        + kneeA * 0.30 * Math.max(0, -cosf);
+  b.RightLeg.rotation.x = kneeBase + kneeA * Math.max(0, -sinf)
+                        + kneeA * 0.30 * Math.max(0, cosf);
+
+  b.LeftFoot.rotation.x  = 0.05 + footA * cosf;
+  b.RightFoot.rotation.x = 0.05 - footA * cosf;
+
+  b.Hips.rotation.x = lean;
+  b.Hips.rotation.z = 0.05 * sinf * gait;
+  b.Hips.position.y = SEG_HIPS_Y + bobA * Math.sin(2*f);
+
+  b.Spine.rotation.x = -0.10*lean + 0.04*Math.sin(t*1.4)*(1-run);
+  b.Spine.rotation.y = 0.12 * sinf * (0.25 + 0.75*run);
+  b.Spine.rotation.z = -0.05 * sinf * gait;
+
+  b.Head.rotation.x = -lean*0.85 + 0.05*Math.sin(t*1.1)*(1-run);
+  b.Head.rotation.y = -b.Spine.rotation.y*0.55 + 0.14*Math.sin(t*0.55)*(1-run);
+  b.Head.rotation.z = -b.Spine.rotation.z*0.85;
+}
+
+/* =========================================================
+   OYUN DURUMU
+   ========================================================= */
+const STATE = { MENU:0, PLAY:1, PAUSE:2, OVER:3 };
+let state = STATE.MENU;
+
+const player = {
+  pos: new THREE.Vector3(0, 7, 0),
+  vel: new THREE.Vector3(),
+  dir: new THREE.Vector3(0, 0, 1),
+  oxy: CFG.oxyStart,
+  invuln: 0,
+  tilt: 0,
+};
+
+let score = 0, best = 0, collected = 0, wave = 1, waveT = 0, elapsed = 0;
+let combo = 0, comboT = 0, lowWarned = false;
+
+/* =========================================================
+   YETENEKLER (SKILLER) — 1 Turbo · 2 O₂ Şoku · 3 Mıknatıs · 4 Sonar
+   ========================================================= */
+const SKILLS = {
+  dash:   { n:'TURBO',    ico:'⚡', cd:CFG.dashCd,   on:'TURBO!' },
+  shock:  { n:'O₂ ŞOKU',  ico:'🫧', cd:CFG.shockCd,  on:'O₂ ŞOKU! +' + CFG.shockOxy },
+  magnet: { n:'MIKNATIS', ico:'🧲', cd:CFG.magnetCd, on:'MIKNATIS AKTİF' },
+  sonar:  { n:'SONAR',    ico:'📡', cd:CFG.sonarCd,  on:'SONAR AKTİF' },
+};
+const skills = {
+  dash:   { cd:0, on:0 },
+  shock:  { cd:0, on:0 },
+  magnet: { cd:0, on:0 },
+  sonar:  { cd:0, on:0 },
+};
+let magnetAura = null;   // mıknatıs halkası mesh'i (tembel oluşturulur)
+
+function tryUse(id) {
+  if (state !== STATE.PLAY) return;
+  const s = skills[id];
+  if (s.cd > 0 || s.on > 0) { Audio.blip(); return; }
+  skills[id].cd = SKILLS[id].cd;
+  switch (id) {
+    case 'dash': {
+      const isW = Math.hypot(player.vel.x, player.vel.z) > 1;
+      if (isW) {
+        // hareket halindeysek mevcut yöne fırla
+        const hv = Math.hypot(player.vel.x, player.vel.z);
+        player.vel.x = player.vel.x/hv*CFG.dashSpeed;
+        player.vel.z = player.vel.z/hv*CFG.dashSpeed;
+      } else {
+        // duruyorsak baktığın yöne fırla
+        const fwd = player.dir.lengthSq() > 0.001 ? player.dir : new THREE.Vector3(0,0,1);
+        player.vel.x = fwd.x*CFG.dashSpeed;
+        player.vel.z = fwd.z*CFG.dashSpeed;
+      }
+      if (player.vel.y > 0) player.vel.y *= 0.35;
+      skills[id].on = CFG.dashTime;
+      Audio.dash();
+      break;
+    }
+    case 'shock':
+      player.oxy = Math.min(CFG.oxyStart, player.oxy + CFG.shockOxy);
+      lowWarned = player.oxy < 30;
+      Audio.repair();
+      break;
+    case 'magnet':
+      skills[id].on = CFG.magnetTime;
+      Audio.magnet();
+      break;
+    case 'sonar':
+      skills[id].on = CFG.sonarTime;
+      Audio.sonarPing();
+      break;
+  }
+  toast(SKILLS[id].on);
+  updateHUD();
+}
+
+function updateSkills(dt) {
+  for (const id in skills) {
+    if (skills[id].cd > 0) skills[id].cd = Math.max(0, skills[id].cd - dt);
+    if (skills[id].on > 0) skills[id].on = Math.max(0, skills[id].on - dt);
+  }
+
+  // mıknatıs halkası
+  if (skills.magnet.on > 0) {
+    if (!magnetAura) {
+      const g = new THREE.RingGeometry(2.7, 3.05, 40);
+      const m = new THREE.MeshBasicMaterial({ color:0x9be8ff, transparent:true, opacity:0.4,
+        side:THREE.DoubleSide, depthWrite:false });
+      magnetAura = new THREE.Mesh(g, m);
+      magnetAura.rotation.x = -Math.PI/2;
+      scene.add(magnetAura);
+    }
+    magnetAura.visible = true;
+    magnetAura.position.set(player.pos.x, player.pos.y - 1.35, player.pos.z);
+    magnetAura.material.opacity = 0.22 + 0.2 * Math.abs(Math.sin(performance.now()*0.006));
+  } else if (magnetAura) magnetAura.visible = false;
+
+  // sonar: en yakın çöpün yönünü CSS değişkenine yaz (pusula iğnesi)
+  if (skills.sonar.on > 0) {
+    let bd = Infinity, bx = 0, bz = 0;
+    for (const t of trash) {
+      if (t.dying) continue;
+      const dx = t.mesh.position.x - player.pos.x, dz = t.mesh.position.z - player.pos.z;
+      const d = dx*dx + dz*dz;
+      if (d < bd) { bd = d; bx = dx; bz = dz; }
+    }
+    if (bd < Infinity) {
+      const ang = Math.atan2(bx, -bz) * 180/Math.PI;   // 0° = kuzey (kamera -Z)
+      document.documentElement.style.setProperty('--sonar-x', ang.toFixed(1) + 'deg');
+    }
+  }
+}
+
+try { best = parseInt(localStorage.getItem('denizcop_best') || '0', 10) || 0; } catch(e) {}
+ui.best.textContent = 'Rekor: ' + best;
+
+const keys = {};
+let btnUp = false, btnDown = false;
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'KeyP') togglePause();
+  if (e.code === 'KeyR' && state !== STATE.PLAY) startGame();
+  if (e.code === 'KeyM') { const m = Audio.toggleMute(); toast(m ? 'SES KAPALI' : 'SES AÇIK'); }
+  if (!e.repeat) {
+    if (e.code === 'Digit1') tryUse('dash');
+    else if (e.code === 'Digit2') tryUse('shock');
+    else if (e.code === 'Digit3') tryUse('magnet');
+    else if (e.code === 'Digit4') tryUse('sonar');
+  }
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+/* ---------- joystick ---------- */
+const stick = { active:false, id:null, cx:0, cy:0, dx:0, dy:0 };
+const stickEl = $('stick'), knobEl = $('stickKnob');
+function stickStart(x, y) {
+  stick.active = true; stick.cx = x; stick.cy = y; stick.dx = stick.dy = 0;
+  stickEl.style.display = 'block';
+  stickEl.style.left = (x-60)+'px'; stickEl.style.top = (y-60)+'px';
+  knobEl.style.transform = 'translate(0,0)';
+}
+function stickMove(x, y) {
+  let dx = x - stick.cx, dy = y - stick.cy;
+  const d = Math.hypot(dx, dy), max = 52;
+  if (d > max) { dx = dx/d*max; dy = dy/d*max; }
+  stick.dx = dx/max; stick.dy = dy/max;
+  knobEl.style.transform = `translate(${dx}px,${dy}px)`;
+}
+function stickEnd() { stick.active = false; stickEl.style.display = 'none'; }
+
+if (IS_TOUCH) {
+  addEventListener('touchstart', e => {
+    for (const t of e.changedTouches) {
+      if (t.target && t.target.closest && t.target.closest('.vbtn')) continue;
+      if (t.clientX < innerWidth*0.6 && !stick.active) { stick.id = t.identifier; stickStart(t.clientX, t.clientY); }
+    }
+  }, {passive:true});
+  addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) {
+      if (stick.active && t.identifier === stick.id) stickMove(t.clientX, t.clientY);
+    }
+  }, {passive:true});
+  addEventListener('touchend', e => {
+    for (const t of e.changedTouches) if (stick.active && t.identifier === stick.id) stickEnd();
+  }, {passive:true});
+  addEventListener('touchcancel', () => { if (stick.active) stickEnd(); }, {passive:true});
+  const bindBtn = (id, set) => {
+    const el = $(id);
+    el.addEventListener('touchstart', e => { e.preventDefault(); set(true); }, {passive:false});
+    el.addEventListener('touchend', e => { e.preventDefault(); set(false); }, {passive:false});
+    el.addEventListener('touchcancel', () => set(false), {passive:true});
+  };
+  bindBtn('upBtn', v => btnUp = v);
+  bindBtn('downBtn', v => btnDown = v);
+}
+
+/* =========================================================
+   OYUN AKIŞI
+   ========================================================= */
+function toast(msg) {
+  ui.toast.textContent = msg;
+  ui.toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=> ui.toast.classList.remove('show'), 1200);
+}
+
+function floater(text, worldPos, big) {
+  const v = worldPos.clone().project(camera);
+  if (v.z > 1 || Math.abs(v.x) > 1.2 || Math.abs(v.y) > 1.2) return;
+  const el = document.createElement('div');
+  el.className = 'floater' + (big ? ' big' : '');
+  el.textContent = text;
+  el.style.left = ((v.x*0.5+0.5) * innerWidth) + 'px';
+  el.style.top  = ((-v.y*0.5+0.5) * innerHeight) + 'px';
+  ui.floaters.appendChild(el);
+  setTimeout(()=> el.remove(), 900);
+}
+
+function clearScene() {
+  for (const t of trash) scene.remove(t.mesh);
+  for (const j of jellies) scene.remove(j.mesh);
+  trash = []; jellies = [];
+}
+
+function startGame() {
+  clearScene();
+  score = 0; collected = 0; wave = 1; waveT = 0; elapsed = 0;
+  combo = 0; comboT = 0; lowWarned = false;
+  player.pos.set(0, 7, 0);
+  player.vel.set(0, 0, 0);
+  player.dir.set(0, 0, 1);
+  player.oxy = CFG.oxyStart;
+  player.invuln = 2.0;
+  player.tilt = 0;
+  for (const id in skills) { skills[id].cd = 0; skills[id].on = 0; }
+  if (playerRoot) { playerRoot.position.copy(player.pos); playerRoot.rotation.y = 0; }
+  if (playerActor) {
+    playerActor.phase = Math.PI; playerActor.sm = 0;
+    if (playerActor.mixer) { playerActor.mixer.stopAllAction(); playerActor.current = null; playerActor.lastStepK = undefined; }
+  }
+
+  Audio.ensure();
+  Audio.startGame();
+  Audio.setDuck(false);
+  Audio.setSurface(false);
+  Audio.setSwim(0);
+  state = STATE.PLAY;
+  ui.menu.classList.add('hidden');
+  ui.pause.classList.add('hidden');
+  ui.over.classList.add('hidden');
+  ui.hud.classList.add('on');
+  ui.oxyWarn.classList.remove('on');
+  ui.combo.classList.remove('show');
+  for (let i=0;i<CFG.startTrash;i++) spawnTrash();
+  spawnJelly(); spawnJelly();
+  updateHUD();
+  toast('DALGA 1');
+}
+
+function togglePause() {
+  if (state === STATE.PLAY) {
+    state = STATE.PAUSE;
+    Audio.setDuck(true); Audio.setSwim(0);
+    ui.pause.classList.remove('hidden');
+  } else if (state === STATE.PAUSE) {
+    state = STATE.PLAY;
+    Audio.setDuck(false);
+    ui.pause.classList.add('hidden');
+  }
+}
+
+function gameOver() {
+  state = STATE.OVER;
+  Audio.gameOver(); Audio.setDuck(true); Audio.setSwim(0);
+  score = Math.floor(score);
+  if (score > best) {
+    best = score;
+    try { localStorage.setItem('denizcop_best', String(best)); } catch(e) {}
+  }
+  ui.finalScore.textContent = score;
+  ui.goTrash.textContent = collected;
+  ui.goTime.textContent = fmt(elapsed);
+  ui.goWave.textContent = wave;
+  ui.goBest.textContent = best;
+  ui.over.classList.remove('hidden');
+  ui.hud.classList.remove('on');
+  ui.oxyWarn.classList.remove('on');
+}
+
+function fmt(t) {
+  const m = Math.floor(t/60), s = Math.floor(t%60);
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+function updateHUD() {
+  ui.score.textContent = Math.floor(score);
+  ui.best.textContent = 'Rekor: ' + best;
+  const o = Math.max(0, player.oxy);
+  ui.oxyBar.style.width = (o / CFG.oxyStart * 100) + '%';
+  ui.oxyBar.classList.toggle('low', o < 30);
+  ui.oxyVal.textContent = Math.ceil(o) + '%';
+  ui.trash.textContent = '♻ ' + collected;
+  ui.wave.textContent = 'DALGA ' + wave;
+  ui.timer.textContent = fmt(elapsed);
+  if (combo > 1 && comboT > 0) {
+    ui.combo.textContent = 'SERİ x' + combo;
+    ui.combo.classList.add('show');
+  } else {
+    ui.combo.classList.remove('show');
+  }
+  const warn = o < 30;
+  ui.oxyWarn.classList.toggle('on', warn);
+  if (warn && !lowWarned) { lowWarned = true; toast('OKSİJEN DÜŞÜK! ÇIK YÜZEYE!'); }
+  const atSurf = player.pos.y >= CFG.breathY;
+  ui.breath.classList.toggle('on', atSurf && state === STATE.PLAY);
+  ui.surfHint.classList.toggle('on', o < 30 && !atSurf && state === STATE.PLAY);
+  ui.depth.textContent = 'Derinlik: ' + Math.max(0, Math.round(22 - player.pos.y)) + ' m';
+  // skill HUD
+  for (const id in skills) {
+    const el = skillEls[id], s = skills[id];
+    el.root.classList.toggle('cooling', s.cd > 0);
+    el.root.classList.toggle('active', s.on > 0);
+    el.cd.textContent = s.cd > 0 ? Math.ceil(s.cd) : '';
+    el.fill.style.height = (s.cd / SKILLS[id].cd * 100).toFixed(1) + '%';
+  }
+  ui.sonarCompass.classList.toggle('on', skills.sonar.on > 0);
+}
+
+/* =========================================================
+   GÜNCELLEME
+   ========================================================= */
+function moveCircle(pos, dx, dz, radius) {
+  pos.x += dx; pos.z += dz;
+  for (const o of obstacles) {
+    const ddx = pos.x - o.x, ddz = pos.z - o.z;
+    const d = Math.hypot(ddx, ddz), min = o.r + radius;
+    if (d < min && d > 0.0001) {
+      pos.x = o.x + ddx/d*min;
+      pos.z = o.z + ddz/d*min;
+    }
+  }
+  const lim = CFG.arenaR - radius;
+  const d = Math.hypot(pos.x, pos.z);
+  if (d > lim) { pos.x = pos.x/d*lim; pos.z = pos.z/d*lim; }
+}
+
+// vücudun gövde merkezi (dikken bel, yatarken kalça hizası)
+function bodyCY() {
+  return player.pos.y + 0.5 + 1.1 * Math.cos(Math.min(Math.PI/2, Math.max(0, player.tilt)));
+}
+
+function update(dt) {
+  elapsed += dt;
+  waveT += dt;
+  if (waveT >= CFG.waveTime) {
+    waveT = 0; wave++;
+    if (jellies.length < 9) spawnJelly();
+    Audio.wave();
+    toast('DALGA ' + wave);
+  }
+  if (comboT > 0) { comboT -= dt; if (comboT <= 0) combo = 0; }
+
+  updateSkills(dt);
+
+  /* --- oyuncu girişi --- */
+  let ix = 0, iz = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) iz -= 1;
+  if (keys['KeyS'] || keys['ArrowDown']) iz += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
+  if (stick.active) { ix += stick.dx; iz += stick.dy; }
+  const up   = !!(keys['Space'] || keys['KeyE'] || btnUp);
+  const down = !!(keys['ShiftLeft'] || keys['ShiftRight'] || keys['KeyC'] || keys['KeyQ'] || btnDown);
+
+  const camFwd = new THREE.Vector3();
+  camera.getWorldDirection(camFwd);
+  camFwd.y = 0;
+  if (camFwd.lengthSq() < 0.001) camFwd.set(0,0,-1);
+  camFwd.normalize();
+  const camRight = new THREE.Vector3(-camFwd.z, 0, camFwd.x);
+
+  const want = new THREE.Vector3()
+    .addScaledVector(camRight, ix)
+    .addScaledVector(camFwd, -iz);
+  const wl = want.length();
+  if (wl > 1) want.divideScalar(wl);
+  if (wl > 0.05) player.dir.lerp(want.clone().normalize(), Math.min(1, dt*10)).normalize();
+
+  const speed = wl > 0.05 ? CFG.hSpeed : 0;
+  const target = want.multiplyScalar(speed);
+  const lerpK = skills.dash.on > 0 ? 2.2 : 10;   // turbo sırasında itiş korunsun
+  player.vel.x += (target.x - player.vel.x) * Math.min(1, dt*lerpK);
+  player.vel.z += (target.z - player.vel.z) * Math.min(1, dt*lerpK);
+  const vyT = (up ? CFG.vSpeed : 0) + (down ? -CFG.vSpeed : 0);
+  player.vel.y += (vyT - player.vel.y) * Math.min(1, dt*8);
+
+  moveCircle(player.pos, player.vel.x*dt, player.vel.z*dt, CFG.playerR);
+  player.pos.y += player.vel.y * dt;
+  if (player.pos.y > CFG.yMax) { player.pos.y = CFG.yMax; player.vel.y = Math.min(0, player.vel.y); }
+  if (player.pos.y < CFG.yMin) { player.pos.y = CFG.yMin; player.vel.y = 0; }
+  const onFloor = player.pos.y <= CFG.yMin + 0.05;
+
+  if (player.invuln > 0) player.invuln -= dt;
+
+  /* --- turbo: itiş sırasında kademeli yavaşlama + kabarcık izi --- */
+  if (skills.dash.on > 0) {
+    const drag = Math.pow(0.42, dt);
+    player.vel.x *= drag; player.vel.z *= drag;
+    spawnSkillTrail();
+  }
+
+  /* --- karakter yerleşimi + animasyon --- */
+  const hv = Math.hypot(player.vel.x, player.vel.z) / CFG.hSpeed;
+  const vy01 = player.vel.y / CFG.vSpeed;
+  if (playerRoot) {
+    playerRoot.position.copy(player.pos);
+    if (player.dir.lengthSq() > 0.001) {
+      const yaw = Math.atan2(player.dir.x, player.dir.z);
+      playerRoot.rotation.y = lerpAngle(playerRoot.rotation.y, yaw, Math.min(1, dt*10));
+    }
+    // gövde yataylaşma: hızlandıkça yüzme pozisyonu; yüzeyde yatık nefeslenir, dip ve dipte ayakta yürür
+    const floating = !onFloor && player.pos.y >= CFG.breathY && hv < 0.4;
+    const tiltT = onFloor ? 0
+      : floating ? 1.52
+      : 1.42 * Math.min(1, hv) - 0.5 * vy01 * Math.min(1, hv);
+    player.tilt += (tiltT - player.tilt) * Math.min(1, dt*4);
+    lastTilt = player.tilt;
+    tiltG.rotation.x = player.tilt;
+    const t = performance.now()*0.001;
+    const flashing = player.invuln > 0 && Math.floor(player.invuln*10) % 2 === 0;
+    playerRoot.visible = !flashing;
+    if (playerActor && playerActor.mixer) {
+      if (onFloor) robotFloorAnim(playerActor, dt, hv);
+      else robotSwimAnim(playerActor, dt, hv, player.pos.y >= CFG.breathY);
+    } else if (onFloor) animateWalk(playerActor, dt, hv, t);
+    else animateSwim(playerActor, dt, hv, vy01, t);
+  }
+
+  /* --- denizanaları --- */
+  for (const j of jellies) {
+    // sürükleme denizde yumuşaktır: yavaş dönüş + sinüzoidal sürüklenme
+    j.t += dt;
+    j.dir += j.turn * dt;
+    if (Math.random() < dt*0.35) j.turn = (Math.random()-0.5)*1.2;
+    const spd = Math.min(3, j.speed + (wave-1)*0.12);
+    const dx = Math.sin(j.dir)*spd*dt, dz = Math.cos(j.dir)*spd*dt;
+    moveCircle(j.pos, dx, dz, 0.9);
+    const bobY = Math.sin(j.t*1.3 + j.ph) * 1.6 * dt + 0.25 * dt * Math.sin(j.ph + j.t*0.4);
+    j.pos.y += bobY;
+    if (j.pos.y > CFG.jMaxY) j.pos.y = CFG.jMaxY;
+    if (j.pos.y < CFG.yMin+0.5) j.pos.y = CFG.yMin+0.5;
+    j.mesh.position.copy(j.pos);
+
+    // nabız animasyonu
+    const pulse = 1 + 0.14 * Math.sin(j.t*3 + j.ph);
+    j.mesh.userData.dome.scale.set(pulse, 1/pulse, pulse);
+    for (const tn of j.mesh.userData.tentacles) {
+      tn.rotation.x = 0.3 * Math.sin(j.t*2.4 + tn.userData.ph);
+      tn.rotation.z = 0.3 * Math.cos(j.t*2.0 + tn.userData.ph);
+    }
+
+    // sokma
+    if (player.invuln <= 0 &&
+        Math.hypot(player.pos.x-j.pos.x, bodyCY()-j.pos.y, player.pos.z-j.pos.z) < 1.55) {
+      player.oxy -= CFG.stingDmg;
+      player.invuln = CFG.invuln;
+      // geri savur
+      const ddx = player.pos.x - j.pos.x, ddz = player.pos.z - j.pos.z;
+      const d = Math.hypot(ddx, ddz) || 1;
+      player.vel.x += ddx/d*14;
+      player.vel.z += ddz/d*14;
+      player.vel.y += 5;
+      combo = 0; comboT = 0;
+      Audio.sting();
+      toast('-' + CFG.stingDmg + ' O₂  DENİZANASI!');
+      updateHUD();
+      if (player.oxy <= 0) { player.oxy = 0; gameOver(); return; }
+    }
+  }
+
+  /* --- mıknatıs: yarıçaptaki çöpler oyuncuya çekilir --- */
+  /* --- çöp toplama (patlama efekti bitince yok olur) --- */
+  const cy = bodyCY();
+  if (skills.magnet.on > 0) {
+    for (const t of trash) {
+      if (t.dying) continue;
+      const p = t.mesh.position;
+      const dx = player.pos.x - p.x, dy = cy - p.y, dz = player.pos.z - p.z;
+      const d = Math.hypot(dx, dy, dz);
+      if (d > 0.8 && d < CFG.magnetR) {
+        const k = CFG.magnetPull * dt / d;
+        p.x += dx*k; p.y += dy*k; p.z += dz*k;
+        if (p.y < 0.6) p.y = 0.6;
+      }
+    }
+  }
+  for (let i=trash.length-1; i>=0; i--) {
+    const tr = trash[i];
+    if (tr.dying) continue;
+    const d = Math.hypot(player.pos.x-tr.mesh.position.x,
+                         cy-tr.mesh.position.y,
+                         player.pos.z-tr.mesh.position.z);
+    if (d < CFG.pickR) {
+      const pos = tr.mesh.position.clone();
+      collected++;
+      combo = comboT > 0 ? Math.min(5, combo+1) : 1;
+      comboT = 4;
+      const gain = tr.type.score * combo;
+      score += gain;
+      player.oxy = Math.min(CFG.oxyStart, player.oxy + tr.type.oxy);
+      lowWarned = player.oxy < 30;
+      floater('+' + gain + (combo > 1 ? '  x' + combo : ''), pos, tr.type.id === 'tire');
+      tr.dying = true; tr.dieT = 0;
+      Audio.pickup(tr.type.id, combo);
+      spawnBurst(pos, tr.type.id === 'tire' ? 0xffd166 : 0x7cffb2);
+      spawnTrash();
+      updateHUD();
+      if (combo === 3 || combo === 5) toast('SERİ x' + combo + '!');
+    }
+  }
+  // masaj: sahnedeki çöp azalırsa yenisi gelsin
+  if (trash.length < CFG.startTrash && Math.random() < dt*0.6) spawnTrash();
+
+  /* --- oksijen: yüzeyde nefes alınır --- */
+  if (player.pos.y >= CFG.breathY) {
+    player.oxy = Math.min(CFG.oxyStart, player.oxy + CFG.breathRate * dt);
+    if (player.oxy > 30) lowWarned = false;
+  } else {
+    player.oxy -= (CFG.oxyDrain + CFG.oxyDrainPerWave*(wave-1)) * dt;
+  }
+  if (player.oxy <= 0) { player.oxy = 0; updateHUD(); gameOver(); return; }
+
+  /* --- ses döngüsü: yüzey nefesi, kalp atışı, yüzme sürtünmesi --- */
+  Audio.setSurface(player.pos.y >= CFG.breathY);
+  Audio.setSwim(Math.min(1, hv));
+  Audio.tick(dt, player.oxy);
+
+  updateHUD();
+}
+
+function lerpAngle(a, b, t) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI*2;
+  while (d < -Math.PI) d += Math.PI*2;
+  return a + d*t;
+}
+
+/* =========================================================
+   ORTAM ANİMASYONU (menüde de çalışır)
+   ========================================================= */
+function ambient(dt) {
+  const t = performance.now()*0.001;
+
+  // kabarcıklar
+  const pos = bubGeo.attributes.position.array;
+  for (let i=0;i<BUB;i++){
+    pos[i*3+1] += bubSpd[i]*dt;
+    pos[i*3]   += Math.sin(t*1.5 + i)*0.15*dt;
+    if (pos[i*3+1] > 22) {
+      pos[i*3+1] = 0;
+      const a = Math.random()*Math.PI*2, r = Math.random()*CFG.arenaR;
+      pos[i*3] = Math.cos(a)*r; pos[i*3+2] = Math.sin(a)*r;
+    }
+  }
+  bubGeo.attributes.position.needsUpdate = true;
+
+  // balıklar
+  for (const f of fishes) {
+    f.a += f.w * dt;
+    const x = f.cx + Math.cos(f.a)*f.R;
+    const z = f.cz + Math.sin(f.a)*f.R;
+    const y = f.y + Math.sin(t*0.7 + f.ph)*0.8;
+    f.g.position.set(x, y, z);
+    const vx = -Math.sin(f.a)*Math.sign(f.w);
+    const vz =  Math.cos(f.a)*Math.sign(f.w);
+    f.g.rotation.y = Math.atan2(vx, vz);
+    f.tail.rotation.y = Math.sin(t*8 + f.ph)*0.55;
+  }
+
+  // deniz otları
+  for (const w of weeds) {
+    w.rotation.z = Math.sin(t*1.4 + w.userData.ph)*0.22;
+    w.rotation.x = Math.cos(t*1.1 + w.userData.ph)*0.1;
+  }
+
+  // huzmeler
+  for (const s of shafts) {
+    s.material.opacity = 0.035 + 0.03 * (0.5 + 0.5*Math.sin(t*0.8 + s.userData.ph));
+  }
+
+  // yüzey dalgalanması
+  surface.rotation.z = Math.sin(t*0.2)*0.03;
+  edgeRing.material.emissiveIntensity = 1.2 + Math.sin(t*2)*0.35;
+
+  // çöplerin süzülmesi + toplanınca büyüyüp solan efekt
+  for (let i=trash.length-1; i>=0; i--) {
+    const tr = trash[i];
+    if (tr.dying) {
+      tr.dieT += dt;
+      const p = Math.min(1, tr.dieT / 0.55);
+      tr.mesh.scale.setScalar(1 + 1.0*p);          // büyü
+      tr.mesh.rotation.y += dt*14;                 // hızlı dön
+      tr.mesh.position.y += dt*2.4;                // yukarı süzül
+      if (!tr.baseOps) {                           // orijinal opaklıkları sakla
+        tr.baseOps = [];
+        tr.mesh.traverse(o => { if (o.isMesh) tr.baseOps.push(o.material.opacity); });
+      }
+      const op = 1 - p*p;                          // sol
+      let k = 0;
+      tr.mesh.traverse(o => {
+        if (o.isMesh) { const m = o.material; m.transparent = true; m.opacity = tr.baseOps[k++] * op; }
+      });
+      if (p >= 1) { scene.remove(tr.mesh); trash.splice(i,1); }
+      continue;
+    }
+    tr.t += dt;
+    tr.mesh.rotation.y += tr.spin*dt;
+    tr.mesh.rotation.x += dt*0.4;
+    tr.mesh.position.y = tr.y + Math.sin(tr.t*1.6)*0.35;
+    tr.mesh.position.x = tr.x + Math.sin(tr.t*0.7)*0.3;
+  }
+
+  // patlama halkaları + kabarcık parçacıkları
+  for (let i=bursts.length-1; i>=0; i--) {
+    const b = bursts[i];
+    b.t += dt;
+    const p = b.t / b.life;
+    if (p >= 1) { scene.remove(b.g); bursts.splice(i,1); continue; }
+    b.ring.scale.setScalar(0.5 + p*3.2);
+    b.ring.quaternion.copy(camera.quaternion);      // kameraya bakan halka
+    b.ring.material.opacity = 0.9*(1-p);
+    for (const bit of b.bits) {
+      bit.position.addScaledVector(bit.userData.v, dt);
+      bit.userData.v.y -= dt*1.2;
+      bit.material.opacity = Math.max(0, 0.95*(1-p));
+      bit.scale.setScalar(Math.max(0.2, 1 - 0.6*p));
+    }
+  }
+
+  updateTrail(dt);
+}
+
+/* =========================================================
+   KAMERA + DÖNGÜ
+   ========================================================= */
+const camPos = new THREE.Vector3().copy(CAM_OFFSET);
+const camTarget = new THREE.Vector3();
+
+function updateCamera(dt) {
+  camTarget.set(player.pos.x, player.pos.y, player.pos.z);
+  const desired = camTarget.clone().add(CAM_OFFSET);
+  camPos.lerp(desired, Math.min(1, dt*3.2));
+  camera.position.copy(camPos);
+  if (camera.position.y < 2.2) camera.position.y = 2.2;
+  if (camera.position.y > 21.6) camera.position.y = 21.6;
+  camera.lookAt(camTarget.x, camTarget.y + 0.8, camTarget.z);
+}
+
+let acc = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  ambient(dt);
+
+  if (state === STATE.PLAY) {
+    acc += dt;
+    const step = 1/60;
+    let guard = 0;
+    while (acc >= step && guard < 5) { update(step); acc -= step; guard++; }
+    if (guard >= 5) acc = 0;
+  } else if (playerActor) {
+    // menü / duraklat / oyun sonunda idle: dipse ayakta duruş, değilse süzülme
+    const t = performance.now()*0.001;
+    const onFloor = player.pos.y <= CFG.yMin + 0.05;
+    if (playerActor.mixer) {
+      robotMenuAnim(playerActor, dt, onFloor, player.pos.y >= CFG.breathY);
+    } else {
+      if (onFloor) animateWalk(playerActor, dt, 0, t);
+      else animateSwim(playerActor, dt, 0, 0, t);
+    }
+    if (playerRoot) {
+      playerRoot.position.copy(player.pos);
+      if (!onFloor) playerRoot.position.y += Math.sin(t*1.6)*0.25;
+      lastTilt = 0;
+      tiltG.rotation.x = onFloor ? 0 : Math.sin(t*1.1)*0.06;
+    }
+  }
+
+  updateCamera(dt);
+  renderer.render(scene, camera);
+}
+
+/* =========================================================
+   SES MOTORU — dosyasız, prosedürel (Web Audio API)
+   su altı: alçak geçiren karartma + reverberasyon + jeneratif ambient
+   ========================================================= */
+const Audio = (() => {
+  let ctx = null, master = null, comp = null, musicGain = null, musicLP = null,
+      sfxGain = null, verb = null, noiseBuf = null,
+      swimSrc = null, swimGain = null, musicStarted = false,
+      surface = false, ducked = false, breathT = 0, heartT = 0;
+  let muted = false;
+  try { muted = localStorage.getItem('denizcop_mute') === '1'; } catch(e) {}
+
+  const counts = { pickup:0, sting:0, step:0, breath:0, heart:0, wave:0,
+                   start:0, over:0, blip:0, chord:0, drop:0, sonar:0, surface:0,
+                   dash:0, repair:0, magnet:0, sonarping:0 };
+
+  const now = () => ctx.currentTime;
+
+  function makeIR(sec){
+    const rate = ctx.sampleRate, len = Math.floor(rate*sec);
+    const buf = ctx.createBuffer(2, len, rate);
+    for (let c=0;c<2;c++){
+      const d = buf.getChannelData(c);
+      for (let i=0;i<len;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2.6);
+    }
+    return buf;
+  }
+  function makeNoise(sec){
+    const rate = ctx.sampleRate, len = Math.floor(rate*sec);
+    const buf = ctx.createBuffer(1, len, rate);
+    const d = buf.getChannelData(0);
+    for (let i=0;i<len;i++) d[i] = Math.random()*2-1;
+    return buf;
+  }
+
+  function ensure(){
+    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ctx = new AC();
+    comp = ctx.createDynamicsCompressor();
+    master = ctx.createGain(); master.gain.value = muted ? 0 : 0.9;
+    master.connect(comp); comp.connect(ctx.destination);
+
+    // müzik yolu: su altı karartması (düşük geçiren)
+    musicLP = ctx.createBiquadFilter(); musicLP.type = 'lowpass';
+    musicLP.frequency.value = 900; musicLP.Q.value = 0.7;
+    musicGain = ctx.createGain(); musicGain.gain.value = 0.5;
+    musicGain.connect(musicLP); musicLP.connect(master);
+
+    sfxGain = ctx.createGain(); sfxGain.gain.value = 0.85; sfxGain.connect(master);
+
+    // üretilmiş oda yankısı (mağara/dip hissi)
+    verb = ctx.createConvolver(); verb.buffer = makeIR(2.4);
+    const vg = ctx.createGain(); vg.gain.value = 0.4;
+    verb.connect(vg); vg.connect(master);
+    musicGain.connect(verb);
+
+    noiseBuf = makeNoise(2);
+    startMusic();
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+
+  function send(node, wet){
+    node.connect(sfxGain);
+    if (wet > 0) { const g = ctx.createGain(); g.gain.value = wet; node.connect(g); g.connect(verb); }
+  }
+  function tone(o){
+    if (!ctx) return;
+    const t0 = now() + (o.t || 0), dur = o.dur || 0.3;
+    const osc = ctx.createOscillator(); osc.type = o.type || 'sine';
+    osc.frequency.setValueAtTime(o.f, t0);
+    if (o.f2) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.f2), t0 + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(o.gain || 0.15, t0 + Math.min(0.03, dur*0.2));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    const flt = ctx.createBiquadFilter(); flt.type = 'lowpass'; flt.frequency.value = o.lp || 7000;
+    osc.connect(g); g.connect(flt); send(flt, o.wet === undefined ? 0.25 : o.wet);
+    osc.start(t0); osc.stop(t0 + dur + 0.05);
+  }
+  function hiss(o){
+    if (!ctx) return;
+    const t0 = now() + (o.t || 0), dur = o.dur || 0.3;
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const flt = ctx.createBiquadFilter(); flt.type = o.type || 'bandpass';
+    flt.frequency.setValueAtTime(o.freq || 1200, t0);
+    flt.Q.value = o.q || 1;
+    if (o.freq2) flt.frequency.exponentialRampToValueAtTime(Math.max(40, o.freq2), t0 + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(o.gain || 0.15, t0 + dur*0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(flt); flt.connect(g); send(g, o.wet === undefined ? 0.3 : o.wet);
+    src.start(t0); src.stop(t0 + dur + 0.05);
+  }
+
+  /* ---------- su altı müziği (jeneratif) ---------- */
+  function startMusic(){
+    if (musicStarted || !ctx) return;
+    musicStarted = true;
+
+    // su akımı gürültüsü (yavaş LFO)
+    const cur = ctx.createBufferSource(); cur.buffer = noiseBuf; cur.loop = true;
+    const cf = ctx.createBiquadFilter(); cf.type = 'lowpass'; cf.frequency.value = 340;
+    const cg = ctx.createGain(); cg.gain.value = 0.05;
+    cur.connect(cf); cf.connect(cg); cg.connect(musicGain);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07;
+    const lg = ctx.createGain(); lg.gain.value = 0.03;
+    lfo.connect(lg); lg.connect(cg.gain);
+    lfo.start(); cur.start();
+
+    // derin drone (hafif detune ile dövüş)
+    [55, 55.4, 82.4].forEach(f => {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+      const g = ctx.createGain(); g.gain.value = 0.05;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 190;
+      o.connect(g); g.connect(lp); lp.connect(musicGain);
+      o.start();
+    });
+
+    const CHORDS = [
+      [110, 164.81, 220, 261.63],      // Am9
+      [87.31, 130.81, 174.61, 220],    // F
+      [130.81, 196, 261.63, 329.63],   // C
+      [98, 146.83, 220, 246.94],       // G
+    ];
+    const DROP = [261.63, 293.66, 349.23, 392, 440, 523.25];  // pentatonik damlalar
+    let ci = 0, chordT = 2, dropT = 1.2, sonarT = 7;
+
+    setInterval(() => {
+      if (!ctx) return;
+      const dt = 0.4;
+      chordT -= dt; dropT -= dt; sonarT -= dt;
+
+      if (chordT <= 0) {
+        chordT = 9 + Math.random()*3;
+        counts.chord++;
+        const ch = CHORDS[ci++ % CHORDS.length];
+        ch.forEach((f, k) => {
+          const t0 = now() + k*0.5;
+          const o = ctx.createOscillator(); o.type = 'sine';
+          o.frequency.value = f * (Math.random() < 0.3 ? 2 : 1);
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.linearRampToValueAtTime(0.045, t0 + 2.5);
+          g.gain.setValueAtTime(0.045, t0 + 6);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 9.5);
+          const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1300;
+          o.connect(g); g.connect(lp); lp.connect(musicGain); g.connect(verb);
+          o.start(t0); o.stop(t0 + 10);
+        });
+      }
+
+      if (dropT <= 0) {
+        dropT = 1.1 + Math.random()*1.9;
+        counts.drop++;
+        const f = DROP[(Math.random()*DROP.length)|0] * (Math.random() < 0.35 ? 2 : 1);
+        const t0 = now();
+        const o = ctx.createOscillator(); o.type = 'sine';
+        o.frequency.setValueAtTime(f*1.9, t0);
+        o.frequency.exponentialRampToValueAtTime(f, t0 + 0.07);   // damla "plop"
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.11, t0 + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.7);
+        o.connect(g); g.connect(musicGain); g.connect(verb);
+        o.start(t0); o.stop(t0 + 0.8);
+      }
+
+      if (sonarT <= 0) {
+        sonarT = 10 + Math.random()*6;
+        counts.sonar++;
+        const t0 = now();
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 980;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.06, t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.3);
+        const d = ctx.createDelay(1.0); d.delayTime.value = 0.55;
+        const fb = ctx.createGain(); fb.gain.value = 0.45;
+        const dg = ctx.createGain(); dg.gain.value = 0.5;
+        o.connect(g); g.connect(musicGain); g.connect(verb);
+        g.connect(d); d.connect(fb); fb.connect(d); d.connect(dg); dg.connect(musicGain);
+        o.start(t0); o.stop(t0 + 1.4);
+      }
+    }, 400);
+  }
+
+  /* ---------- oyun sfx'leri ---------- */
+  return {
+    ensure,
+    get ctxState(){ return ctx ? ctx.state : 'none'; },
+    get muted(){ return muted; },
+    get counts(){ return Object.assign({}, counts); },
+    toggleMute(){
+      muted = !muted;
+      try { localStorage.setItem('denizcop_mute', muted ? '1' : '0'); } catch(e) {}
+      if (ctx) master.gain.setTargetAtTime(muted ? 0 : 0.9, now(), 0.05);
+      return muted;
+    },
+    blip(){ if (!ctx) return; counts.blip++;
+      tone({ f:520, f2:760, dur:0.12, gain:0.14, wet:0.15 }); },
+    pickup(type, combo){
+      if (!ctx) return;
+      counts.pickup++;
+      const m = 1 + 0.11 * (Math.min(combo, 5) - 1);   // seri tınıyı yükseltir
+      if (type === 'bottle') {
+        tone({ f:880*m, f2:1320*m, dur:0.22, gain:0.2, wet:0.3 });
+        tone({ t:0.06, f:1500*m, f2:2400*m, dur:0.14, gain:0.1, wet:0.45 });
+      } else if (type === 'can') {
+        tone({ f:660*m, type:'triangle', dur:0.28, gain:0.18, wet:0.35 });
+        tone({ f:1580*m, dur:0.3, gain:0.08, wet:0.5 });
+        tone({ f:2470*m, dur:0.24, gain:0.05, wet:0.5 });
+      } else if (type === 'bag') {
+        hiss({ dur:0.35, gain:0.16, freq:2600, freq2:700, q:1.4, wet:0.4 });
+        tone({ f:520*m, f2:700*m, dur:0.18, gain:0.09, wet:0.3 });
+      } else {   // lastik
+        tone({ f:190*m, f2:70, dur:0.4, gain:0.26, wet:0.15, lp:420 });
+        hiss({ dur:0.25, gain:0.12, type:'lowpass', freq:500, freq2:150, wet:0.2 });
+      }
+      tone({ t:0.05, f:1800, f2:2600, dur:0.1, gain:0.05, wet:0.5 });  // kabarcık
+    },
+    sting(){ if (!ctx) return; counts.sting++;
+      tone({ f:120, f2:60, type:'sawtooth', dur:0.5, gain:0.24, wet:0.15, lp:900 });
+      hiss({ dur:0.4, gain:0.2, freq:900, freq2:200, q:2, wet:0.35 });
+      tone({ t:0.02, f:44, f2:30, dur:0.5, gain:0.3, wet:0.05 }); },
+    step(){ if (!ctx) return; counts.step++;
+      hiss({ dur:0.12, gain:0.09, type:'lowpass', freq:420, freq2:180, wet:0.15 });
+      tone({ f:75, f2:55, dur:0.1, gain:0.07, wet:0.05 }); },
+    breath(){ if (!ctx) return; counts.breath++;
+      // iç çekme -> verme -> kabarcıklar
+      hiss({ dur:0.75, gain:0.2, freq:350, freq2:1500, q:1.1, wet:0.25 });
+      hiss({ t:0.9, dur:0.9, gain:0.18, freq:1400, freq2:420, q:1.2, wet:0.3 });
+      for (let i=0;i<4;i++)
+        tone({ t:1.0 + i*0.16 + Math.random()*0.05,
+               f:600 + Math.random()*350, f2:1000 + Math.random()*500,
+               dur:0.12, gain:0.06, wet:0.55 }); },
+    heart(){ if (!ctx) return; counts.heart++;
+      tone({ f:62, f2:44, dur:0.16, gain:0.26, wet:0 });
+      tone({ t:0.34, f:58, f2:40, dur:0.14, gain:0.19, wet:0 }); },
+    wave(){ if (!ctx) return; counts.wave++;
+      tone({ f:660, f2:330, dur:0.9, gain:0.18, wet:0.5 });
+      tone({ t:0.12, f:440, type:'triangle', dur:1.1, gain:0.09, wet:0.5 });
+      tone({ t:0.12, f:660, dur:1.1, gain:0.06, wet:0.5 }); },
+    startGame(){ if (!ctx) return; counts.start++;
+      [392, 523.25, 659.25].forEach((f, i) =>
+        tone({ t:i*0.09, f, type:'triangle', dur:0.3, gain:0.15, wet:0.35 })); },
+    gameOver(){ if (!ctx) return; counts.over++;
+      [440, 349.23, 261.63, 196].forEach((f, i) =>
+        tone({ t:i*0.22, f, dur:0.6, gain:0.16, wet:0.5, lp:1400 }));
+      hiss({ t:0.1, dur:1.4, gain:0.1, type:'lowpass', freq:700, freq2:120, wet:0.4 }); },
+    // --- skill sfx ---
+    dash(){ if (!ctx) return; counts.dash++;
+      hiss({ dur:0.45, gain:0.22, freq:500, freq2:3200, q:0.9, wet:0.3 });
+      tone({ f:150, f2:60, dur:0.35, gain:0.2, wet:0.1, lp:500 }); },
+    repair(){ if (!ctx) return; counts.repair++;
+      [523.25, 659.25, 783.99].forEach((f, i) =>
+        tone({ t:i*0.08, f, type:'triangle', dur:0.3, gain:0.16, wet:0.45 }));
+      for (let i=0;i<5;i++)
+        tone({ t:0.05 + i*0.09, f:900 + Math.random()*600, f2:1600 + Math.random()*700,
+               dur:0.1, gain:0.05, wet:0.6 }); },
+    magnet(){ if (!ctx) return; counts.magnet++;
+      const t0 = now(), dur = CFG.magnetTime;
+      const o = ctx.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(70, t0);
+      o.frequency.exponentialRampToValueAtTime(120, t0 + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(0.05, t0 + 0.3);
+      g.gain.setValueAtTime(0.05, t0 + dur - 0.4);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 380;
+      o.connect(g); g.connect(lp); send(lp, 0.2);
+      o.start(t0); o.stop(t0 + dur + 0.1); },
+    sonarPing(){ if (!ctx) return; counts.sonarping++;
+      const t0 = now();
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 1150;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.14, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6);
+      const d = ctx.createDelay(1.0); d.delayTime.value = 0.42;
+      const fb = ctx.createGain(); fb.gain.value = 0.42;
+      const dg = ctx.createGain(); dg.gain.value = 0.5;
+      o.connect(g); g.connect(sfxGain); g.connect(verb);
+      g.connect(d); d.connect(fb); fb.connect(d); d.connect(dg); dg.connect(sfxGain);
+      o.start(t0); o.stop(t0 + 1.7); },
+    setSurface(on){
+      if (!ctx || surface === on) return;
+      surface = on;
+      // yüzeye çıkınca su karartması açılır, inince kapanır
+      musicLP.frequency.setTargetAtTime(on ? 4200 : 900, now(), 0.35);
+      if (on) { counts.surface++;
+        hiss({ dur:1.6, gain:0.14, type:'lowpass', freq:900, freq2:300, wet:0.4 }); }
+    },
+    setDuck(on){
+      if (!ctx || ducked === on) return;
+      ducked = on;
+      musicGain.gain.setTargetAtTime(on ? 0.14 : 0.5, now(), 0.2);
+    },
+    setSwim(v){
+      if (!ctx) return;
+      if (!swimSrc) {
+        swimSrc = ctx.createBufferSource(); swimSrc.buffer = noiseBuf; swimSrc.loop = true;
+        const flt = ctx.createBiquadFilter(); flt.type = 'lowpass'; flt.frequency.value = 650;
+        swimGain = ctx.createGain(); swimGain.gain.value = 0;
+        swimSrc.connect(flt); flt.connect(swimGain); swimGain.connect(sfxGain);
+        swimSrc.start();
+      }
+      swimGain.gain.setTargetAtTime(Math.min(0.1, v * 0.1), now(), 0.15);
+    },
+    // oyun döngüsünden çağrılır: nefes döngüsü + oksijen kalp atışı
+    tick(dt, oxy){
+      if (!ctx) return;
+      if (surface) { breathT -= dt; if (breathT <= 0) { breathT = 2.6; this.breath(); } }
+      else breathT = 0;
+      if (oxy < 30) {
+        heartT -= dt;
+        if (heartT <= 0) { heartT = oxy < 15 ? 1.1 : 1.6; this.heart(); }
+      } else heartT = 0;
+    },
+  };
+})();
+window.__audio = Audio;
+
+/* =========================================================
+   UI BAĞLANTILARI
+   ========================================================= */
+$('startBtn').addEventListener('click', () => { Audio.ensure(); Audio.blip(); startGame(); });
+$('againBtn').addEventListener('click', () => { Audio.ensure(); Audio.blip(); startGame(); });
+$('resumeBtn').addEventListener('click', () => { Audio.blip(); togglePause(); });
+
+// ilk dokunuş/tuşta ses motorunu başlat (tarayıcı politikası)
+addEventListener('pointerdown', function once(){ Audio.ensure(); }, { once:true });
+addEventListener('keydown', function once(){ Audio.ensure(); }, { once:true });
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+addEventListener('blur', () => { if (state === STATE.PLAY) togglePause(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state === STATE.PLAY) togglePause();
+});
+
+boot().catch(err => {
+  ui.loadTxt.textContent = 'HATA: ' + (err && err.message ? err.message : err);
+  ui.loadTxt.style.color = '#ff6b81';
+  console.error(err);
+});
+
+/* =========================================================
+   TEST / DEBUG KÖPRÜSÜ
+   ========================================================= */
+window.__game = {
+  get state(){ return state; },
+  get score(){ return Math.floor(score); },
+  get oxy(){ return player.oxy; },
+  get wave(){ return wave; },
+  get combo(){ return combo; },
+  get collected(){ return collected; },
+  get trash(){ return trash.length; },
+  get jellies(){ return jellies.length; },
+  get atSurface(){ return player.pos.y >= CFG.breathY; },
+  get depth(){ return Math.max(0, Math.round(22 - player.pos.y)); },
+  get onFloor(){ return player.pos.y <= CFG.yMin + 0.05; },
+  get dying(){ return trash.filter(t=>t.dying).length; },
+  get bursts(){ return bursts.length; },
+  effectState(){
+    const d = trash.find(t => t.dying);
+    let op = null, sc = null;
+    if (d) {
+      sc = +d.mesh.scale.x.toFixed(2);
+      d.mesh.traverse(o => { if (o.isMesh && op === null) op = +o.material.opacity.toFixed(2); });
+    }
+    const b = bursts[0];
+    return { dying: !!d, scale: sc, opacity: op,
+      ring: b ? { s:+b.ring.scale.x.toFixed(2), o:+b.ring.material.opacity.toFixed(2) } : null,
+      bits: b ? b.bits.length : 0 };
+  },
+  get player(){ return {x:+player.pos.x.toFixed(2), y:+player.pos.y.toFixed(2), z:+player.pos.z.toFixed(2),
+                        vx:+player.vel.x.toFixed(2), vy:+player.vel.y.toFixed(2), tilt:+player.tilt.toFixed(2)}; },
+  get jellyList(){ return jellies.map(j => ({x:+j.pos.x.toFixed(1), y:+j.pos.y.toFixed(1), z:+j.pos.z.toFixed(1)})); },
+  trashPos(n = 12){ return trash.filter(t => !t.dying).slice(0, n)
+    .map(t => ({x:+t.mesh.position.x.toFixed(1), y:+t.mesh.position.y.toFixed(1), z:+t.mesh.position.z.toFixed(1)})); },
+  get cam(){ return {x:+camera.position.x.toFixed(1), y:+camera.position.y.toFixed(1), z:+camera.position.z.toFixed(1)}; },
+  get robotAnim(){ return playerActor && playerActor.mixer ? playerActor.current : 'fallback-bones'; },
+  start: startGame,
+  key(k, v){ keys[k] = v; },
+  setOxy(v){ player.oxy = v; },
+  use(id){ tryUse(id); return this.skill(id); },
+  skill(id){ const s = skills[id]; return s ? { cd:+s.cd.toFixed(2), on:+s.on.toFixed(2) } : null; },
+  get skills(){ const o = {}; for (const id in skills) o[id] = { cd:+skills[id].cd.toFixed(2), on:+skills[id].on.toFixed(2) }; return o; },
+  get skillTrail(){ return trailArr.length; },
+  gotoTrash(i = 0){
+    const alive = trash.filter(t => !t.dying);
+    if (!alive.length) return false;
+    const tr = alive[i % alive.length];
+    player.pos.set(tr.mesh.position.x, tr.mesh.position.y, tr.mesh.position.z);
+    if (playerRoot) playerRoot.position.copy(player.pos);
+    return tr.type.id;
+  },
+  gotoJelly(i = 0){
+    if (!jellies.length) return false;
+    const j = jellies[i % jellies.length];
+    player.pos.copy(j.pos);
+    player.invuln = 0;
+    if (playerRoot) playerRoot.position.copy(player.pos);
+    return true;
+  },
+  animInfo(){
+    if (!playerActor) return 'NO ACTOR';
+    if (playerActor.mixer) {
+      const w = playerActor.actions.walk;
+      return { mode: playerActor.current,
+        walkT: w ? +w.time.toFixed(2) : 0,
+        walkDur: w ? +w.getClip().duration.toFixed(2) : 0 };
+    }
+    if (!playerActor.bones) return 'NO BONES';
+    const b = playerActor.bones;
+    return {
+      phase:+playerActor.phase.toFixed(2),
+      lThigh:+b.LeftUpLeg.rotation.x.toFixed(3),
+      rThigh:+b.RightUpLeg.rotation.x.toFixed(3),
+      lKnee:+b.LeftLeg.rotation.x.toFixed(3),
+      rKnee:+b.RightLeg.rotation.x.toFixed(3),
+      headX:+b.Head.rotation.x.toFixed(3),
+      hipsY:+b.Hips.position.y.toFixed(4),
+      tilt:+player.tilt.toFixed(3),
+    };
+  },
+  step(n = 60, dt = 1/60){
+    for (let i=0;i<n && state===STATE.PLAY;i++) update(dt);
+    renderer.render(scene, camera);
+    return { state, score:Math.floor(score), oxy:+player.oxy.toFixed(1), collected,
+             combo, wave, trash:trash.length, jellies:jellies.length, anim:this.animInfo() };
+  },
+  render(){ renderer.render(scene, camera); },
+  _pv(v){ if (playerRoot) playerRoot.visible = v; },
+  _setCam(x, y, z){ camera.position.set(x, y, z); camera.lookAt(player.pos.x, player.pos.y+0.8, player.pos.z); },
+  bench(frames = 45){
+    if (state !== STATE.PLAY) startGame();
+    while (jellies.length < 8) spawnJelly();
+    renderer.render(scene, camera);
+    const t0 = performance.now();
+    for (let i=0;i<frames;i++) renderer.render(scene, camera);
+    const ms = (performance.now()-t0)/frames;
+    return { jellies:jellies.length, trash:trash.length,
+             msPerFrame:+ms.toFixed(2), estFps:+(1000/ms).toFixed(0) };
+  },
+  // kareyi okuyup ASCII luminans haritası döndürür (görsel doğrulama)
+  capture(w = 96, h = 54) {
+    renderer.render(scene, camera);
+    const src = renderer.domElement;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    g.drawImage(src, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data;
+    const chars = ' .:-=+*#%@';
+    const rows = [];
+    let sum = 0, maxv = 0, nonBlack = 0;
+    for (let y=0;y<h;y++){
+      let row = '';
+      for (let x=0;x<w;x++){
+        const i = (y*w+x)*4;
+        const lum = (d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114)/255;
+        sum += lum; if (lum > maxv) maxv = lum; if (lum > 0.04) nonBlack++;
+        row += chars[Math.min(9, Math.floor(lum*9.99))];
+      }
+      rows.push(row);
+    }
+    return { rows, avg:+(sum/(w*h)).toFixed(3), max:+maxv.toFixed(3),
+             nonBlackPct:+(nonBlack/(w*h)*100).toFixed(1) };
+  },
+  probe(){
+    const toScreen = (x,y,z) => {
+      const v = new THREE.Vector3(x,y,z).project(camera);
+      return { x:+v.x.toFixed(2), y:+v.y.toFixed(2), z:+v.z.toFixed(2),
+               visible: v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 };
+    };
+    return {
+      playerScreen: toScreen(player.pos.x, player.pos.y, player.pos.z),
+      camPos: {x:+camera.position.x.toFixed(1), y:+camera.position.y.toFixed(1), z:+camera.position.z.toFixed(1)},
+      trash: trash.slice(0,4).map(t => ({type:t.type.id, ...toScreen(t.mesh.position.x, t.mesh.position.y, t.mesh.position.z)})),
+      jellies: jellies.slice(0,4).map(j => ({...toScreen(j.pos.x, j.pos.y, j.pos.z),
+        d:+Math.hypot(j.pos.x-player.pos.x, j.pos.y-player.pos.y, j.pos.z-player.pos.z).toFixed(1)})),
+      rendererSize: {w:renderer.domElement.width, h:renderer.domElement.height},
+    };
+  },
+};
+</script>
+</body>
+</html>
